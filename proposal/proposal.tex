@@ -1,0 +1,349 @@
+% Optimizing Compilers Final Project
+% Proposal Document
+% Abi Kim, Kyle Dotterrer, Wan Shen Lim
+% 1 April, 2021
+
+%% ==================================================================
+%% BOILERPLATE
+%% ==================================================================
+
+\documentclass{vldb}
+
+\newcommand{\paperTitle}{Profile Generation and Guided Optimization\\ for Compiled Queries\\ 
+    \large Project Proposal Document\\
+    \today}
+\newcommand{\paperKeywords}{}
+\newcommand{\paperAuthors}{}
+
+\setlength{\paperheight}{11in}
+\setlength{\paperwidth}{8.5in}
+
+\usepackage[
+            bookmarks=true,
+            bookmarksopen=true,
+            pdfhighlight=/I,
+            pdfpagemode=UseOutlines,
+            linkcolor=blue,
+            pdfborder={ 0 0 0 },
+            pageanchor=false]{hyperref}
+\hypersetup{
+    pdfauthor = {\paperAuthors},
+    pdftitle = {\paperTitle},
+    pdfkeywords = {\paperKeywords},
+    pdfborder={ 0 0 0 }
+}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{times}
+\usepackage{boxedminipage}
+\usepackage{xspace}
+\usepackage{array}
+\usepackage{epsfig}
+\usepackage{calc}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{enumitem}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usepackage{wasysym }
+\usepackage[hyphenbreaks]{breakurl}
+\usepackage{xcolor}
+\usepackage[font={small}]{caption}
+\usepackage{alltt}
+\usepackage{setspace}
+\usepackage{wrapfig}
+\usepackage{etoolbox}
+
+% Font selection
+\usepackage[final]{microtype}
+\usepackage[scaled]{inconsolata}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{soul}
+\usepackage{pifont}
+
+% Other misc. things
+\usepackage{float}
+\usepackage{bookmark}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{latexsym}
+\usepackage{multirow}
+\usepackage{emptypage}
+\usepackage{booktabs}
+\usepackage{enumerate}
+\usepackage{braket}
+\usepackage{balance}
+
+%% ==================================================================
+%% MACROS
+%% ==================================================================
+
+\newcommand{\subparagraph}{}
+
+\newcommand{\sysname}{NoisePage\xspace}
+
+% Framework Components
+\newcommand{\dbTranslator}{Translator\xspace}
+\newcommand{\dbCompiler}{Compiler\xspace}
+\newcommand{\dbPlanner}{planner\xspace}
+\newcommand{\dbInterpreter}{interpreter\xspace}
+\newcommand{\dbAnalyzer}{analyzer\xspace}
+\newcommand{\dbPCQ}{PCQ\xspace}
+\newcommand{\dbAQP}{AQP\xspace}
+\newcommand{\dbHook}{hook\xspace}
+\newcommand{\dbHooks}{hooks\xspace}
+
+\newcommand{\dbSQL}[1]{\texttt{\textbf{#1}}\xspace}
+\newcommand{\dbTable}[1]{\texttt{\MakeUppercase{#1}}\xspace}
+\newcommand{\dbColumn}[1]{\texttt{col#1}\xspace}
+\newcommand{\dbRawColumn}[1]{\texttt{#1}\xspace}
+\newcommand{\dbConfig}[1]{\textsf{#1}\xspace}
+
+\newcommand{\dbmsOracle}{Oracle\xspace}
+\newcommand{\dbmsDBTwo}{DB2\xspace}
+\newcommand{\dbmsTeradata}{Teradata\xspace}
+\newcommand{\dbmsHANA}{HANA\xspace}
+\newcommand{\dbmsMSSQL}{SQL Server\xspace}
+\newcommand{\dbmsMySQL}{MySQL\xspace}
+\newcommand{\dbmsPostgres}{PostgreSQL\xspace}
+\newcommand{\dbmsMemSQL}{MemSQL\xspace}
+\newcommand{\dbmsHyper}{HyPer\xspace}
+\newcommand{\dbmsVector}{Vector\xspace}
+
+\newcommand{\tplType}[1]{\texttt{#1}\xspace}
+\newcommand{\tpl}{\texttt{TPL}\xspace}
+\newcommand{\tbc}{\texttt{TBC}\xspace}
+\newcommand{\dbCode}[1]{{\sffamily\small \textbf{#1}}\xspace}
+
+\newcommand{\tidlist}{\texttt{TupleIdList}\xspace}
+\newcommand{\tidlists}{\texttt{TupleIdLists}\xspace}
+
+%% ==================================================================
+%% PAPER CONTENT
+%% ==================================================================
+
+\begin{document}
+
+\title{\paperTitle}
+
+\numberofauthors{3}
+\author{
+    \alignauthor Abi Kim, Kyle Dotterrer, Wan Shen Lim\\
+    \affaddr{Carnegie Mellon University}\\
+}
+
+% Remove the space for the copyright box for VLDB
+\makeatletter
+\def\@copyrightspace{\relax}
+\makeatother
+
+\maketitle
+
+%% ==================================================================
+%% INTRODUCTION
+%% ==================================================================
+
+\section{Introduction}
+
+This document describes our proposal for our final project in CMU's 15-745: \textit{Optimizing Compilers} course. The remainder of this document is structured as follows. First, in Section 1, we provide some group metdata. Next, in Section 2, we present our project proposal. Section 3 provides logistical information related to our group plans to conduct the project. We conclude in Section 4 with a brief literature review.
+
+%% ==================================================================
+%% METADATA
+%% ==================================================================
+
+\section{Metadata}
+
+The members of our group are:
+
+\begin{itemize}
+    \item Abigale Kim (abigalek@cmu.edu)
+    \item Kyle Dotterer (kdottere@cs.cmu.edu)
+    \item Wan Shen Lim (wanshenl@cs.cmu.edu)
+\end{itemize}
+
+Project website: https://turingcompl33t.github.io/compilers-final/.
+
+%% ==================================================================
+%% PROJECT DESCRIPTION
+%% ==================================================================
+
+\section{Project Description}
+
+The following section provides a description of our project.
+
+\subsection{Project Goals}
+
+The goal of our project is to improve the runtime performance of query execution in a data-centric code generation DBMS engine by integrating dynamic optimization techniques. Specifically, we aim to implement profile-guided optimization for JIT-compiled queries in the NoisePage \cite{noisepage} LLVM-based execution engine. We identify the following subtasks:
+
+\begin{itemize}
+    \item Implement support for collection of low-level statistics and profile information in the NoisePage JIT. These statistics may include runtime information for individual query pipelines, enabling the implementation of the SQL \dbCode{EXPLAIN ANALYZE} command. More importantly, this profile information generated through this implementation will be used as input to other components of the system.
+    \item Implement a custom LLVM pass (or passes) that incorporates profile information and the LLVM IR itself to more aggressively optimize hot paths.
+    \item Implement a feedback loop mechanism that allows for an automated feedback-driven exploration of the space of potential LLVM optimization passes, based on the profile information generated by prior iterations.
+    \item Explore techniques for efficient instrumentation of fused operators. Sufficient gains in efficiency might allow us to gather and utilize profile information in an online setting, rather than merely across queries.
+\end{itemize}
+
+We foresee challenges in this project arising from the following sources:
+
+\begin{itemize}
+    \item \textbf{Operator Fusion} In a typical DBMS, \dbCode{EXPLAIN ANALYZE} is simpler to implement because each operator is clearly demarcated. However, with the introduction of relaxed operator fusion in our execution engine, it is no longer clear what each operator is contributing to an overall pipeline’s work. Existing DBMS code-generation engines such as HyPer simply do not support \dbCode{EXPLAIN ANALYZE}. The SingleStore engine implements something similar in their \dbCode{PROFILE} command, but naturally this implementation is closed-source. How does one instrument pipelines of fused operators?
+    \item \textbf{Optimization Pass(es)} We need to determine the appropriate pass or passes to implement that will be able to make effective use of the profile data we intend to gather. We assume that only a subset of available profile-guided optimization passes will be applicable in the context of our project.
+    \item \textbf{Profile Data Collection} When profile-guided optimization is typically implemented in `traditional' ahead-of-time compilers, profile information is written to an external file on the local filesystem. For our purposes, such an approach may be inappropriate because of the prohibitive runtime overhead of file IO. However, persisting the profile information in memory only introduces its own set of challenges, the most salient being the total volume of memory that may be consumed by the profile information if it is maintained indefinitely.
+    \item \textbf{The DBMS-Centric Context} Some salient points of the DBMS setting are:
+    \begin{itemize}
+        \item Highly multi-user: no single query should starve the entire system of resources.
+        \item Time to first response matters: it is not acceptable to spend too long optimizing instead of quickly responding.
+        \item Adaptive execution allows more time to be spent compiling anyway: fast OLTP queries are run through an interpreter, long OLAP queries are compiled in the background and swapped in when compilation is complete. This model lends itself well to multiple stages of compilation with different optimization levels, we are unaware of existing projects that draw a link between adaptive execution and profile-guided optimization.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Preliminary Implementation Details}
+
+Profile information that we are considering collecting includes:
+
+\begin{itemize}
+    \item Function entry probes: count the number of invocations of each function
+    \item Basic block probes: count the number of entries to each basic block
+    \item Edge probes: construct a graph of common transitions
+    \item Value probes: construct a histogram of typical values at program points (e.g. branches)
+\end{itemize}
+
+Guided optimizations that we are considering using or implementing on the basis of this profile information include:
+
+\begin{itemize}
+    \item Full and partial inlining
+    \item Function layout
+    \item Speed and size decision
+    \item Basic block layout (i.e. block packing)
+    \item Code separation
+    \item Virtual call speculation
+    \item Switch expansion
+    \item Data separation
+    \item Loop unrolling
+\end{itemize}
+
+\subsection{Metrics}
+
+The primary metrics are compilation time and end-to-end runtime. Other miscellaneous statistics such as static or dynamic instruction counts may be collected, however, there is no direct correlation between instruction count and overall query performance.
+
+\subsection{Targets}
+
+\begin{itemize}
+    \item \textbf{75\%} A custom LLVM pass taking (profile information, TPL) as input, operating with handcrafted manual optimization passes that should be applied to hot/cold pipelines.
+    \item \textbf{100\%} An automated feedback-driven exploration of the space of LLVM optimization passes for any given hot/cold pipeline.
+    \item \textbf{125\%} Assuming that profiling is slow, an exploration of efficient instrumentation techniques (especially in the context of fused operators) to allow for online profiling.
+\end{itemize}
+
+%% ==================================================================
+%% LOGISTICS
+%% ==================================================================
+
+\section{Logistics}
+
+The following section describes preliminary project logistics.
+
+\subsection{Critical Path}
+
+Initially, it appears that the availability of profile information is the limiting factor for other features of our project. However, we foresee various methods by which we may begin implementation of multiple project components in parallel. The custom LLVM pass must be able to perform (possibly handcrafted) optimization passes based on profiling data. This does not necessarily require support for generation of profile information because that pass may operate on notional or “dummy” data and assume that real profile information will be integrated at some future point. Similarly, the low-level components of the feedback loop mechanism may be designed, implemented, and tested on notional data. However, full support for profile data generation will need to be implemented before an end-to-end solution for optimization feedback is possible.
+
+The critical path for the project depends on designing the interfaces between individual components. Before beginning implementation, we require answers to the following questions:
+
+\begin{itemize}
+    \item What is a suitable format for the profile data generated by the instrumented code?
+    \item How do other components in the system access the profile information once it is stored?
+    \item What is the cost model used to determine the relative efficiency of individual optimization passes?
+\end{itemize}
+
+The two components will be connected with a common JSON data interchange format for now.
+
+\subsection{Division of Work}
+
+Approximately, we plan to divide the work of the project as follows:
+
+\begin{itemize}
+    \item Building the optimization passes
+    \item Building profiling infrastructure
+\end{itemize}
+
+\subsection{Schedule}
+
+The tentative schedule for project design and implementation follows below.
+
+\textbf{Week of 04/02 to 04/08}
+\begin{itemize}
+    \item Abi: Literature search/theoretical reasoning/testing to determine possible optimizations that we would want to include in our feedback loop. 
+    \item Kyle: Literature review of profile-guided optimization passes. Determine tentative list of profile features that may be required for pass implementation.
+    \item Wan: Examine the state of profiling generated code in NoisePage. This was done in an ad-hoc manner for another unrelated research project, so there are some impediments that need to be resolved to collect statistics in a principled manner.
+\end{itemize}
+
+\textbf{Week of 04/09 to 04/15}
+\begin{itemize}
+    \item Abi: First pass at coding the feedback loop. Implement logic determined by literature search. Test, and change predictions, and repeat. 
+    Coding the feedback loop requires determining hot and cold paths, then determining optimizations for the hot paths. 
+    \item Kyle: Also code the feedback loop. Make a final decision regarding the passes that will be implemented. Finalize the set of profile features required to implement these passes. Begin implementation for profile-guided passes.
+    \item Wan: Support the collection of execution time at the granularity of pipelines. (i.e., entire fused operators). Attempt to support the collection of compilation time as well.
+\end{itemize}
+
+\textbf{Week of 04/16 to 04/22}
+\begin{itemize}
+    \item Abi: Work on milestone report. Include more optimizations given granularity of instrumentation. Modify feedback loop as necessary given more information.
+    \item Kyle: Work on milestone report. Continue work on profile-guided optimization passes. Begin integration with data collected from actual profiling.
+    \item Wan: Work on milestone report. Support collecting both compilation and execution time at a pipeline granularity. Attempt to refine the granularity of instrumentation.
+\end{itemize}
+
+\textbf{Week of 04/23 to 04/29}
+\begin{itemize}
+    \item Abi: Flexible. Continue to modify the feedback loop as necessary given more information.  
+    \item Kyle: Flexible
+    \item Wan: Flexible.
+\end{itemize}
+
+\textbf{Week of 04/30 to 05/06}
+\begin{itemize}
+    \item Abi: Work on final report. Flexible. (possibly collect more data/testing/results for final report).
+    \item Kyle: Work on final report.
+    \item Wan: Work on final report. Flexible.
+\end{itemize}
+
+\subsection{Milestone}
+
+By 4/22, we aim to have achieved our 75\% goal.
+
+\subsection{Required Resources}
+
+The project will be implemented in the NoisePage DBMS. This project is open-source software, implying that we already have the access we need. 
+
+We do not foresee any additional hardware requirements for this project.
+
+At present, we believe that we have all of the resources necessary to conduct this study.
+
+\subsection{Getting Started}
+
+No work has been completed thus far on this project other than writing up this proposal. There are no impediments to beginning work on this project immediately.
+
+%% ==================================================================
+%% LITERATURE REVIEW
+%% ==================================================================
+
+\section{Literature Review}
+
+While not the central focus of this project, the NoisePage execution engine plays a crucial role in our study - it is the substrate in which our project is implemented. Accordingly, knowledge of both the general concepts of query compilation as well as the details specific to NoisePage's implementation is an important prerequisite prior to beginning work on the project. Relevant background information regarding query compilation is available in \cite{paroski16}, \cite{krikellas10}, and \cite{neumann11} among others. Descriptions specific to the NoisePage execution engine are provided by \cite{rof} and \cite{pcq}.
+
+We conducted a brief survey of database systems that implement query compilation in a manner similar to NoisePage. We find that most state-of-the-art systems do not implement a feature analogous to \dbCode{EXPLAIN ANALYZE}. The HyPer DBMS is an example of such a system \cite{hyper}. This is likely a result of the aforementioned difficulty that accompanies the implementation of this feature in data-centric code generation engines. However, one system, the SingleStore DBMS does appear to support functionality similar to that provided by \dbCode{EXPLAIN ANALYZE} in the form of its \dbCode{PROFILE} command \cite{singlestore}.
+
+One important piece of information that we currently lack is a comprehensive review of techniques available for optimizations enabled by profile information. In this class, our primary focus has been on optimization passes that operate as pure functions of the input code. For this project, however, one of the contributions we hope to make is an optimization pass (or passes) that use profile information to apply optimizations that would otherwise be impossible. In the lecture on Dynamic Compilation, we reviewed two specific profile-guided optimization passes: partial dead code elimination and partial escape analysis \cite{whaley01, stadler14}. While these optimizations give us some idea of the style and structure of the optimizations that might be enabled by profile information, the degree of their applicability to our domain is questionable. We will need to conduct a more thorough survey of existing techniques in this space to decide upon the specific passes that are most relevant to our project.
+
+%% ==================================================================
+%% BIBLIOGRAPHY
+%% ==================================================================
+
+% NOTE: Had to add this mysterious command to compile...
+\newcommand{\newblock}{}
+
+\newpage
+\balance
+\bibliographystyle{abbrv}
+\bibliography{proposal}
+
+\end{document}
