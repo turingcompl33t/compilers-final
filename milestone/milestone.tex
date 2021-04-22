@@ -1,0 +1,374 @@
+% Optimizing Compilers Final Project
+% Milestone Document
+% Abi Kim, Kyle Dotterrer, Wan Shen Lim
+% 21 April, 2021
+
+%% ==================================================================
+%% BOILERPLATE
+%% ==================================================================
+
+\documentclass{vldb}
+
+\newcommand{\paperTitle}{Profile Generation and Guided Optimization\\ for Compiled Queries\\ 
+    \large Project Proposal Document\\
+    \today}
+\newcommand{\paperKeywords}{}
+\newcommand{\paperAuthors}{}
+
+\setlength{\paperheight}{11in}
+\setlength{\paperwidth}{8.5in}
+
+\usepackage[
+            bookmarks=true,
+            bookmarksopen=true,
+            pdfhighlight=/I,
+            pdfpagemode=UseOutlines,
+            linkcolor=blue,
+            pdfborder={ 0 0 0 },
+            pageanchor=false]{hyperref}
+\hypersetup{
+    pdfauthor = {\paperAuthors},
+    pdftitle = {\paperTitle},
+    pdfkeywords = {\paperKeywords},
+    pdfborder={ 0 0 0 }
+}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{times}
+\usepackage{boxedminipage}
+\usepackage{xspace}
+\usepackage{array}
+\usepackage{epsfig}
+\usepackage{calc}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{enumitem}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usepackage{wasysym }
+\usepackage[hyphenbreaks]{breakurl}
+\usepackage{xcolor}
+\usepackage[font={small}]{caption}
+\usepackage{alltt}
+\usepackage{setspace}
+\usepackage{wrapfig}
+\usepackage{etoolbox}
+
+% Font selection
+\usepackage[final]{microtype}
+\usepackage[scaled]{inconsolata}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{soul}
+\usepackage{pifont}
+
+% Other misc. things
+\usepackage{float}
+\usepackage{bookmark}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{latexsym}
+\usepackage{multirow}
+\usepackage{emptypage}
+\usepackage{booktabs}
+\usepackage{enumerate}
+\usepackage{braket}
+\usepackage{balance}
+\usepackage{listings}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=C++,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=2
+}
+
+%% ==================================================================
+%% MACROS
+%% ==================================================================
+
+\newcommand{\subparagraph}{}
+
+\newcommand{\sysname}{NoisePage\xspace}
+
+% Framework Components
+\newcommand{\dbTranslator}{Translator\xspace}
+\newcommand{\dbCompiler}{Compiler\xspace}
+\newcommand{\dbPlanner}{planner\xspace}
+\newcommand{\dbInterpreter}{interpreter\xspace}
+\newcommand{\dbAnalyzer}{analyzer\xspace}
+\newcommand{\dbPCQ}{PCQ\xspace}
+\newcommand{\dbAQP}{AQP\xspace}
+\newcommand{\dbHook}{hook\xspace}
+\newcommand{\dbHooks}{hooks\xspace}
+
+\newcommand{\dbSQL}[1]{\texttt{\textbf{#1}}\xspace}
+\newcommand{\dbTable}[1]{\texttt{\MakeUppercase{#1}}\xspace}
+\newcommand{\dbColumn}[1]{\texttt{col#1}\xspace}
+\newcommand{\dbRawColumn}[1]{\texttt{#1}\xspace}
+\newcommand{\dbConfig}[1]{\textsf{#1}\xspace}
+
+\newcommand{\dbmsOracle}{Oracle\xspace}
+\newcommand{\dbmsDBTwo}{DB2\xspace}
+\newcommand{\dbmsTeradata}{Teradata\xspace}
+\newcommand{\dbmsHANA}{HANA\xspace}
+\newcommand{\dbmsMSSQL}{SQL Server\xspace}
+\newcommand{\dbmsMySQL}{MySQL\xspace}
+\newcommand{\dbmsPostgres}{PostgreSQL\xspace}
+\newcommand{\dbmsMemSQL}{MemSQL\xspace}
+\newcommand{\dbmsHyper}{HyPer\xspace}
+\newcommand{\dbmsVector}{Vector\xspace}
+
+\newcommand{\tplType}[1]{\texttt{#1}\xspace}
+\newcommand{\tpl}{\texttt{TPL}\xspace}
+\newcommand{\tbc}{\texttt{TBC}\xspace}
+\newcommand{\dbCode}[1]{{\sffamily\small \textbf{#1}}\xspace}
+
+\newcommand{\tidlist}{\texttt{TupleIdList}\xspace}
+\newcommand{\tidlists}{\texttt{TupleIdLists}\xspace}
+
+%% ==================================================================
+%% PAPER CONTENT
+%% ==================================================================
+
+\begin{document}
+
+\title{\paperTitle}
+
+\numberofauthors{3}
+\author{
+    \alignauthor Abi Kim, Kyle Dotterrer, Wan Shen Lim\\
+    \affaddr{Carnegie Mellon University}\\
+}
+
+% Remove the space for the copyright box for VLDB
+\makeatletter
+\def\@copyrightspace{\relax}
+\makeatother
+
+\maketitle
+
+%% ==================================================================
+%% INTRODUCTION
+%% ==================================================================
+
+\section{Introduction}
+
+This document describes our milestone report for our final project in CMU's 15-745: \textit{Optimizing Compilers} course. The remainder of this document is structured as follows. First, in Section 1, we describe the major changes that we have introduced since our original proposal. Next, in Section 2, we present our current progress. Section 3 discusses our progress relative to our original milestone goal. In Section 5 we list some of the surprises we have encountered thuis far. Section 6 describes our revised schedule for the remainder of the project. We conclude in Section 7 with our required resources.
+
+%% ==================================================================
+%% MAJOR CHANGES
+%% ==================================================================
+
+\section{Major Changes}
+
+One major change that has occurred since our initial proposal is the publication of a paper by the TUM group that has implications for our project \cite{beischl21}. This paper demonstrates that it is possible to gather profiling information across multiple abstraction levels, specifically, across the query compilation boundary. This was a major open question in the feasibility of our proposal that is now (in theory) resolved. Furthermore, the paper describes some high-level implementation details of the mechanisms used to gather and process this profiling information, giving us answers to several design decisions that we had not yet resolved. With the publication of this paper, we may proceed under the assumption that we can record profile information for JIT-compiled queries and subsequently attach the recorded metrics (e.g. execution time, instruction count, memory hierarchy behavior, etc.) to any layer of the query compilation pipeline (e.g. bytecode instruction, DSL operation, or SQL operator).
+
+Profile generation at arbitrary abstraction levels is the primary focus of the TUM group's recent publication. In this model (and in the example use cases presented in the paper), the profile information is intended to grant developers further insights into the behavior of the code in their dataflow system, allowing them to manually inspect the source of performance limitations and optimize accordingly. Therefore, the portion of our project that addresses automatic selection and application of optimization passes based on the profiling information remains a novel and interesting direction for research. For this reason, our updated goals for the project are to:
+
+\begin{itemize}
+    \item Implement a profiling subsystem similar to the one described in the TUM group paper
+    \item Utilize the profile data generated by this subsystem to inform automatic tuning and selection of optimization passes
+    \item Ideally, characterize the effect of typical optimization passes for different database-centric workloads
+\end{itemize}
+
+This set of goals replaces one of the original goals we formulated in our project proposal with the last new goal. Specifically, we no longer endeavor to implement a new custom LLVM pass which would operate on the collected profile data and apply it to the lowest-layer of the NoisePage \cite{noisepage} execution engine. There are a number of reasons we have revised our goals to exclude this requirement:
+
+\begin{itemize}
+    \item Development Time: While the description of profile generation by the TUM paper certainly helps us by answering some design questions, it simultaneously introduces significant implementation complexity. We estimate that implementing the approach described in the paper will prove to be significantly more difficult than the approach we initially intended to pursue. We believe however that the additional effort involved will be worth the cost.
+    \item Reuse: Profile-guided optimization already exists to a certain degree in LLVM, and it seems more appropriate to try to hook into the existing LLVM infrastructure than to come up with a domain-specific PGO pass.
+    \item Value: It is possible for us to work more quickly in the time remaining by aiming to apply existing optimization passes at a higher level of abstraction, such as at the level of "what LLVM optimization passes make sense for an OLTP workload vs an OLAP workload". Prior work in e.g., ML has shown that the order in which passes are applied matters, and therefore we aim to focus on the same in a database context.
+\end{itemize}
+
+%% ==================================================================
+%% CURRENT PROGRESS
+%% ==================================================================
+
+\section{Current Progress}
+
+This section describes the progress that we have made so far. Please see the appendix for a simple example.
+
+\subsection{Profile Generation}
+
+In our first attempt at profile generation, we were able to implement a system in which we can gather pipeline-level execution times and function-level optimization times.
+
+Since reading the TUM paper, we have since revised our approach to profile generation. Specifically, we now have a complete, concrete plan for gathering execution profiles for JIT-compiled queries in NoisePage that proceeds approximately as follows:
+
+\begin{itemize}
+    \item Track the query through stages of query compilation. When a query is submitted to the system, (and we desire profile generation for the query, naturally this cannot be the default mode for performance reasons), we track the query through each stage of query compilation and generate a tagging dictionary [0] at each stage. This tagging dictionary effectively maps from the lower-level intermediate representation for the query to the higher-level intermediate representation construct that generated it.
+    \item Wrap the execution of the JIT-compiled query in the necessary profiling infrastructure to track desired hardware and software metrics. Currently, much of the infrastructure necessary to collect a fine-grained execution profile for query execution is tied to the Linux perf API.
+    \item Combine the profile data with the tagging dictionaries for the query to map from the native code back up to the desired abstraction level. In order to implement the \dbCode{EXPLAIN ANALYZE} command, we map all the way back up to the operator tree for the query, but there is no reason that we cannot also present profile information at lower levels of the query compilation abstraction hierarchy.
+\end{itemize}
+
+\subsection{Feedback Loop}
+
+Most of our work on the other major component of our project has consisted of literature review on possible optimizations that we might apply during the automated tuning process, and additional constraints that the existing codebase(s) may impose on us. We have not yet begun integrating the code that implements the automated tuning framework into the NoisePage codebase.
+
+%% ==================================================================
+%% MEETING OUR MILESTONE
+%% ==================================================================
+
+\section{Meeting our Milestone}
+
+We did not meet the milestone identified in our original project proposal. The primary reason for this is that we re-prioritized the overall goals of our project on the basis of new information:
+
+\begin{itemize}
+    \item Further consideration of the merits of implementing profile-guided optimization passes in the context of a data-centric DBMS execution engine (see \textit{Major Changes})
+    \item The publication of the TUM paper describing profile generation across abstraction levels in dataflow systems
+\end{itemize}
+
+In other words, we did not meet our milestone, but this is largely a result of the fact that our project goals have shifted significantly. We recognize that this still constitutes a shortcoming of our initial planning for the project, but we stand by the architectural changes we have made and are confident in both our direction and rate of progress.
+
+%% ==================================================================
+%% SURPRISES
+%% ==================================================================
+
+\section{Surprises}
+
+One implementation-related surprise we have encountered pertains to the LLVM API. It turns out that LLVM offers both legacy and new-style pass managers, where the new-style pass managers appear to have slightly incomplete support for certain legacy patterns, and where our (fixed) environment appears to be missing certain dependencies required to use the new-style pass managers. Initially it appeared that it would be beneficial to switch to the new-style pass manager for the purpose of instrumenting \textit{CFG simplification} time at a finer granularity, but it appears that we will have to pursue an alternative approach.
+
+%% ==================================================================
+%% REVISED SCHEDULE
+%% ==================================================================
+
+\section{Revised Schedule}
+
+The revised schedule for each of our group members is provided below.
+
+\begin{itemize}
+    \item \textbf{Abi}: Will continue working on the feedback loop jointly with Wan (formerly with Kyle).
+    \item \textbf{Wan}: Was initially working on instrumentation for the execution engine. In light of the TUM paper and shifting interests, will now work on the automated optimization selection and tuning framework (feedback loop). For an example of feedback loop ideas and direction, please see appendix.
+    \item \textbf{Kyle}: Was initially working on the automated optimization selection and tuning framework. In light of the TUM paper and shifting interests, will now work on implementing the profiling subsystem described in the TUM paper.
+\end{itemize}
+
+%% ==================================================================
+%% REQUIRED RESOURCES
+%% ==================================================================
+
+\section{Required Resources}
+
+We do not require any additional resources to complete our project.
+
+\appendix
+\section{Optimization for Compiled Queries}
+
+Currently, Prof. Mowry's Ph.D. student Prashanth has empirically identified the below combination of passes as the best combination of passes for query optimization for his thesis work. This combination of passes is uniformly applied to all queries that we compile in the NoisePage DBMS.
+
+\begin{lstlisting}
+// Run the following at O3, no size optimization, inline at hot call sites.
+//   Instruction recombine
+//   Reassociation
+//   Global value numbering
+//   Control-flow-graph simplification
+//   Aggressive dead-code elimination
+//   Control-flow-graph simplification
+\end{lstlisting}
+
+You may however imagine using knowledge such as workload type (OLTP vs OLAP, i.e., short running vs long lived, point updates vs range scans, etc.), to pick a different set of function passes for different queries, etc. After consideration of our options and the constraints of the existing code, this is an example of the domain-specific knowledge that we believe can be incorporated into our feedback loop, in addition to the typical profile statistics of both compilation and execution time.
+
+A simple baseline for understanding what the passes are doing is to remove all passes, checking to see the quality of the subsequent IR. This was previously done by hand. We have invested time in the project so far in making it simple to quickly obtain targeted information about a function. This is demonstrated here with a small excerpt, serving also as a demo of some information that we are currently gathering (note that this only shows information gathered at compile time, information such as execution time and cache misses which need to be gathered at run time is currently harder to instrument).
+
+\subsection{Input DSL}
+
+The DSL for performing an aggregation over a table that is being compiled is shown in the listing below.
+
+\begin{lstlisting}
+fun pipeline_1(execCtx: *ExecutionContext, state: *State) -> nil {
+    var ht = &state.table
+    var tvi: TableVectorIterator
+    var table_oid = @testCatalogLookup(execCtx, "test_1", "")
+    var col_oids: [2]uint32
+    col_oids[0] = @testCatalogLookup(execCtx, "test_1", "colA")
+    col_oids[1] = @testCatalogLookup(execCtx, "test_1", "colB")
+    for (@tableIterInit(&tvi, execCtx, table_oid, col_oids); @tableIterAdvance(&tvi); ) {
+        var vec = @tableIterGetVPI(&tvi)
+        for (; @vpiHasNext(vec); @vpiAdvance(vec)) {
+            var hash_val = @hash(@vpiGetInt(vec, 1))
+            var agg = @ptrCast(*Agg, @aggHTLookup(ht, hash_val, keyCheck, vec))
+            if (agg == nil) {
+                agg = @ptrCast(*Agg, @aggHTInsert(ht, hash_val))
+                constructAgg(agg, vec)
+            } else {
+                updateAgg(agg, vec)
+            }
+        }
+    }
+    @tableIterClose(&tvi)
+}
+\end{lstlisting}
+
+\subsection{Optimizations Applied}
+
+With all of Prashanth's optimizations applied, the third basic block becomes
+
+\begin{lstlisting}
+[2021-04-21 21:21:51.175] [execution_logger] [info] LLVM dump for pipeline_1 (90 instructions, 551831 ns optimize):
+
+define void @pipeline_1(%"class.noisepage::execution::exec::ExecutionContext"*, %0*) personality i32 (...)* @__gxx_personality_v0 {
+
+BB3:                                              ; preds = %BB7, %BB2
+  %10 = phi i16 [ %67, %BB7 ], [ %.pre, %BB2 ]
+  %11 = getelementptr inbounds %"class.noisepage::execution::sql::TableVectorIterator", %"class.noisepage::execution::sql::TableVectorIterator"* %2, i64 0, i32 7, i32 3
+  %12 = load i16, i16* %11, align 8, !tbaa !9
+  %13 = icmp ult i16 %10, %12
+  br i1 %13, label %BB4, label %BB1
+\end{lstlisting}
+
+\subsection{Without Optimization}
+
+With no optimizations applied, the third basic block appears as follows
+
+\begin{lstlisting}
+[2021-04-21 21:20:57.958] [execution_logger] [info] LLVM dump for pipeline_1 (105 instructions, 118338 ns optimize):
+
+define void @pipeline_1(%"class.noisepage::execution::exec::ExecutionContext"*, %0*) personality i32 (...)* @__gxx_personality_v0 {
+
+...
+
+BB3:                                              ; preds = %BB7, %BB2
+  %12 = bitcast %"class.noisepage::execution::sql::TableVectorIterator"* %2 to i8*
+  %sunkaddr = getelementptr i8, i8* %12, i64 4290
+  %13 = bitcast i8* %sunkaddr to i16*
+  %14 = load i16, i16* %13, align 2, !tbaa !2
+  %15 = zext i16 %14 to i64
+  %16 = bitcast %"class.noisepage::execution::sql::TableVectorIterator"* %2 to i8*
+  %sunkaddr18 = getelementptr i8, i8* %16, i64 4288
+  %17 = bitcast i8* %sunkaddr18 to i16*
+  %18 = load i16, i16* %17, align 8, !tbaa !9
+  %19 = icmp ult i16 %14, %18
+  %20 = zext i1 %19 to i8
+  br i1 %19, label %BB4, label %BB1
+\end{lstlisting}
+
+\subsection{Discussion}
+
+As shown, we are able to obtain simple statistics like instruction count, time taken to apply optimization passes, etc.
+
+%% ==================================================================
+%% BIBLIOGRAPHY
+%% ==================================================================
+
+% NOTE: Had to add this mysterious command to compile...
+\newcommand{\newblock}{}
+
+\newpage
+\balance
+\bibliographystyle{abbrv}
+\bibliography{milestone}
+
+\end{document}
