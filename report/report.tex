@@ -1,0 +1,232 @@
+% Optimizing Compilers Final Project
+% Final Report
+% Abi Kim, Kyle Dotterrer, Wan Shen Lim
+% 5 May, 2021
+
+%% ==================================================================
+%% BOILERPLATE
+%% ==================================================================
+
+\documentclass{vldb}
+
+\newcommand{\paperTitle}{Profile Generation and Guided Optimization\\ for Compiled Queries\\ 
+    \large Final Report\\
+    \today}
+\newcommand{\paperKeywords}{}
+\newcommand{\paperAuthors}{}
+
+\setlength{\paperheight}{11in}
+\setlength{\paperwidth}{8.5in}
+
+\usepackage[
+            bookmarks=true,
+            bookmarksopen=true,
+            pdfhighlight=/I,
+            pdfpagemode=UseOutlines,
+            linkcolor=blue,
+            pdfborder={ 0 0 0 },
+            pageanchor=false]{hyperref}
+\hypersetup{
+    pdfauthor = {\paperAuthors},
+    pdftitle = {\paperTitle},
+    pdfkeywords = {\paperKeywords},
+    pdfborder={ 0 0 0 }
+}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{times}
+\usepackage{boxedminipage}
+\usepackage{xspace}
+\usepackage{array}
+\usepackage{epsfig}
+\usepackage{calc}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{enumitem}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usepackage{wasysym }
+\usepackage[hyphenbreaks]{breakurl}
+\usepackage{xcolor}
+\usepackage[font={small}]{caption}
+\usepackage{alltt}
+\usepackage{setspace}
+\usepackage{wrapfig}
+\usepackage{etoolbox}
+
+% Font selection
+\usepackage[final]{microtype}
+\usepackage[scaled]{inconsolata}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{soul}
+\usepackage{pifont}
+
+% Other misc. things
+\usepackage{float}
+\usepackage{bookmark}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{latexsym}
+\usepackage{multirow}
+\usepackage{emptypage}
+\usepackage{booktabs}
+\usepackage{enumerate}
+\usepackage{braket}
+\usepackage{balance}
+\usepackage{listings}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=C++,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=2
+}
+
+%% ==================================================================
+%% MACROS
+%% ==================================================================
+
+\newcommand{\subparagraph}{}
+
+\newcommand{\sysname}{NoisePage\xspace}
+
+% Framework Components
+\newcommand{\dbTranslator}{Translator\xspace}
+\newcommand{\dbCompiler}{Compiler\xspace}
+\newcommand{\dbPlanner}{planner\xspace}
+\newcommand{\dbInterpreter}{interpreter\xspace}
+\newcommand{\dbAnalyzer}{analyzer\xspace}
+\newcommand{\dbPCQ}{PCQ\xspace}
+\newcommand{\dbAQP}{AQP\xspace}
+\newcommand{\dbHook}{hook\xspace}
+\newcommand{\dbHooks}{hooks\xspace}
+
+\newcommand{\dbSQL}[1]{\texttt{\textbf{#1}}\xspace}
+\newcommand{\dbTable}[1]{\texttt{\MakeUppercase{#1}}\xspace}
+\newcommand{\dbColumn}[1]{\texttt{col#1}\xspace}
+\newcommand{\dbRawColumn}[1]{\texttt{#1}\xspace}
+\newcommand{\dbConfig}[1]{\textsf{#1}\xspace}
+
+\newcommand{\dbmsOracle}{Oracle\xspace}
+\newcommand{\dbmsDBTwo}{DB2\xspace}
+\newcommand{\dbmsTeradata}{Teradata\xspace}
+\newcommand{\dbmsHANA}{HANA\xspace}
+\newcommand{\dbmsMSSQL}{SQL Server\xspace}
+\newcommand{\dbmsMySQL}{MySQL\xspace}
+\newcommand{\dbmsPostgres}{PostgreSQL\xspace}
+\newcommand{\dbmsMemSQL}{MemSQL\xspace}
+\newcommand{\dbmsHyper}{HyPer\xspace}
+\newcommand{\dbmsVector}{Vector\xspace}
+
+\newcommand{\tplType}[1]{\texttt{#1}\xspace}
+\newcommand{\tpl}{\texttt{TPL}\xspace}
+\newcommand{\tbc}{\texttt{TBC}\xspace}
+\newcommand{\dbCode}[1]{{\sffamily\small \textbf{#1}}\xspace}
+
+\newcommand{\tidlist}{\texttt{TupleIdList}\xspace}
+\newcommand{\tidlists}{\texttt{TupleIdLists}\xspace}
+
+%% ==================================================================
+%% PAPER CONTENT
+%% ==================================================================
+
+\begin{document}
+
+\title{\paperTitle}
+
+\numberofauthors{3}
+\author{
+    \alignauthor Abi Kim, Kyle Dotterrer, Wan Shen Lim\\
+    \affaddr{Carnegie Mellon University}\\
+}
+
+% Remove the space for the copyright box for VLDB
+\makeatletter
+\def\@copyrightspace{\relax}
+\makeatother
+
+\maketitle
+
+%% ==================================================================
+%% INTRODUCTION
+%% ==================================================================
+
+\section{Introduction}
+
+This document describes our milestone report for our final project in CMU's 15-745: \textit{Optimizing Compilers} course. 
+
+\subsection{Problem Statement}
+
+\subsection{Approach}
+
+\subsection{Related Work}
+
+\subsection{Contributions}
+
+The remainder of this document is structured as follows. First, in Section 2, we provide a detailed description of our design and approach. Next, in Sections 3 and 4, we describe our experimental setup and the results of our evaluation. Section 5 discusses some surprised and lessons learned over the course of the project. We conclude in Section 6 and comment on potential directions for future work.
+
+%% ==================================================================
+%% DESIGN AND APPROACH
+%% ==================================================================
+
+\section{Design and Approach}
+
+%% ==================================================================
+%% EXPERIMENTAL SETUP
+%% ==================================================================
+
+\section{Experimental Setup}
+
+%% ==================================================================
+%% EXPERIMENTAL EVALUATION
+%% ==================================================================
+
+\section{Experimental Evaluation}
+
+%% ==================================================================
+%% SURPRISES AND LESSONS LEARNED
+%% ==================================================================
+
+\section{Surprises and Lessons Learned}
+
+%% ==================================================================
+%% CONCLUSION AND FUTURE WORK
+%% ==================================================================
+
+\section{Conclusion and Future Work}
+
+%% ==================================================================
+%% WORK DISTRIBUTION
+%% ==================================================================
+
+\section{Work Distribution}
+
+%% ==================================================================
+%% BIBLIOGRAPHY
+%% ==================================================================
+
+% NOTE: Had to add this mysterious command to compile...
+\newcommand{\newblock}{}
+
+\newpage
+\balance
+\bibliographystyle{abbrv}
+\bibliography{report}
+
+\end{document}
