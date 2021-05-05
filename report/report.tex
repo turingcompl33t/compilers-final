@@ -170,7 +170,7 @@
 
 \section{Introduction}
 
-This document describes our milestone report for our final project in CMU's 15-745: \textit{Optimizing Compilers} course. 
+This document contains our final report for our final project in CMU's 15-745: \textit{Optimizing Compilers} course. 
 
 \subsection{Problem Statement}
 
@@ -217,7 +217,7 @@ In this project, we make the following contributions:
     \item Explore the feasibility of implementing a profiling subsystem via tailored profiling \cite{beischl21} in the NoisePage DBMS. A key insight is that often, an optimizing compiler must make decisions based on limited or even no information as to how its optimizations will affect the overall program’s efficiency. By implementing a profiling subsystem that can track profile data across multiple abstraction levels, a profile-guided optimizer will have a much richer set of information to understand the budget, scope, and impact of any optimizations made. 
     \item Explore the feasibility of automated search strategies for determining what set of LLVM transform passes to apply and at what granularity, e.g., whole-program vs function-level. We find that automated search is indeed possible to implement.
     \item Evaluate our strategy against a set of hand-picked globally-applied LLVM function transform passes that were empirically chosen by a DBMS+compilers domain expert Dr. Menon. While we find that Dr. Menon is very difficult to defeat on similar grounds (whole-program optimization), we find that our strategy is effective at rapidly sampling the space of potential optimizations to find promising and cheap transformations for a given SQL query, which allows for a number of exploratory techniques such as iterating on the domain expert's knowledge with genetic algorithms, completely random sampling of complete pipelines in hopes of lottery tickets, etc.
-    \item In the NoisePage DBMS, and perhaps similar DBMSes which have integrated a separate query processing engine DSL by grafting new storage layer builtins into the language, it actually doesn’t matter whether you apply LLVM transform passes or not, and in fact you save more microseconds by performing 0 transform passes overall.
+    \item In the NoisePage DBMS, and perhaps similar DBMSes which have integrated a separate query processing engine DSL by grafting new storage layer builtins into the language, it actually doesn't matter whether you apply LLVM transform passes or not, and in fact you save more microseconds by performing 0 transform passes overall.
 \end{itemize}
 
 The remainder of this document is structured as follows. First, in Section 2, we provide a detailed description of our design and approach. Next, in Sections 3 and 4, we describe our experimental setup and the results of our evaluation. Section 5 discusses some surprised and lessons learned over the course of the project. We conclude in Section 6 and comment on potential directions for future work.
@@ -238,7 +238,7 @@ We made two initial attempts at implementing the profiling subsystem that ultima
 
 \begin{itemize}
     \item \textbf{Attempt \#1: Solve it in C++} We attempted to modify the C++ translators that convert DBMS physical plans to \tpl code by inserting calls to instrumentation functions. This proved tedious, unwieldy, error-prone, and provided only low-resolution information. 
-    \item \textbf{Attempt \#2: Solve it in \tpl} We have (and continue to use) implemented the recording of information at execution time into DSL-level structs. This makes it convenient to record features such as the number of entries into a given function. However, this requires all the information that you want to record to be exposed in the DSL level itself, which may not be feasible and is a lot of tedium.
+    \item \textbf{Attempt \#2: Solve it in \tpl} We have (and continue to use) implemented the recording of information at execution time into DSL-level structs. This makes it convenient to record features such as the number of entries into a given function. However, this requires all the information that you want to record to be exposed at the DSL level itself, which may not always be practical and introduces unnecessary complexity.
 \end{itemize}
 
 We abandoned both of these approaches upon learning of the general solution to profiling across abstraction levels presented by Beischl et al. \cite{beischl21}.
@@ -250,7 +250,7 @@ The final design of our profiling subsystem is based on the tailored profiling d
 The profiling subsystem assumes responsibility for two distinct tasks:
 
 \begin{itemize}
-    \item \textbf{Tagging Dictionary Construction}: The tagging dictionary is a multi-level dictionary data structure that allows us to effectively undo the lowering performed by the NoisePage execution engine during the code generation and query compilation process. Each level of the tagging dictionary maps individual operations in some intermediate representation to the operation at the next higher level of abstraction that produced it. The tagging dictionary is constructed as the query is lowered from the physical query plan tree to native machine code.
+    \item \textbf{Tagging Dictionary Construction}: The \textit{tagging dictionary} is a multi-level dictionary data structure that allows us to effectively undo the lowering performed by the NoisePage execution engine during the code generation and query compilation process. Each level of the tagging dictionary maps individual operations in some intermediate representation to the operation at the next higher level of abstraction that produced it. The tagging dictionary is constructed as the query is lowered from the physical query plan tree to native machine code.
     \item \textbf{Runtime Sample Collection}: We utilize the Linux perf API \cite{perf} to collect an execution profile for JIT-compiled queries as they are executed. 
 \end{itemize}
 
@@ -265,16 +265,18 @@ Our implementation of the tagging dictionary recognizes the following five inter
     \item x86 Machine Code
 \end{itemize}
 
-We utilize a tagging dictionary with three levels to record the translations that are performed across the entirety of the lowering process. The lowest level of translation from x86 to LLVM IR is accomplished via debugging information emitted by the LLVM JIT when the native code object is originally produced. A brief description of the implementation required to populate each level of the tagging dictionary is provided below.
+We utilize a tagging dictionary with three levels to record the translations that are performed across the entirety of the lowering process. The lowest level mapping (from x86 to LLVM IR) is generated without manual population of the tagging dictionary by parsing the debugging information emitted by the LLVM JIT when the native code object is originally produced. 
+
+A brief description of the implementation required to populate each level of the tagging dictionary is provided below.
 \begin{itemize}
-    \item \textbf{\tpl AST Node to SQL Operator}: We populate this level of the tagging dictionary during the first phase of code generation. We modify the code generator’s operator translators to emit tags whenever a new AST node is constructed.
+    \item \textbf{\tpl AST Node to SQL Operator}: We populate this level of the tagging dictionary during the first phase of code generation. We modify the code generator's operator translators to emit tags whenever a new AST node is constructed.
     \item \textbf{\tpl Bytecode to \tpl AST Node}: We populate this level of the tagging dictionary during the second phase of code generation. We add functionality to the TPL compiler that allows us to inject a callback function that emits a tag whenever the bytecode generator emits a new bytecode instruction.
     \item \textbf{LLVM IR Instruction to \tpl Bytecode}: We populate this level of the tagging dictionary during query compilation. We manually insert calls to emit tags whenever a new IR instruction is inserted into the compiled module.
 \end{itemize}
 
 \subsubsection{Profile Sample Collection}
 
-We utilize the Linux perf API to collect an execution profile for the JIT-compiled query as it is executed. We utilize event-based sampling on instruction retirement (\lstinline{INST_RETIRED.PREC_DIST}) events. A sample is collected every 5,000 events. To ensure the accuracy of the collected samples, we request precise instruction pointers (0 skid) in our samples; this enables the Processor Event Based Sampling (PEBS) feature on Intel platforms \cite{intelmanual}. This sampling configuration is the same as that utilized by Beischl et al. in their proof-of-concept \cite{beischl21}.
+We utilize the Linux perf API to collect an execution profile for the JIT-compiled query as it is executed. We utilize event-based sampling on instruction retirement (\lstinline{INST_RETIRED.PREC_DIST}) events. A sample is collected every 5,000 events. To ensure the accuracy of the collected samples, we request precise instruction pointers (0 skid); this enables the Processor Event Based Sampling (PEBS) feature on Intel platforms \cite{intelmanual}. This sampling configuration is the same as that utilized by Beischl et al. in their proof-of-concept \cite{beischl21}.
 
 Samples are written to a memory-mapped ring buffer by the kernel at the specified interval. We read the raw samples from this ring buffer and serialize them to a JSON file for subsequent processing.
 
@@ -309,14 +311,13 @@ def genetic(passes):
     
 # Pick a random ordering of distinct passes such that each pass improves the time frame significantly.
 def distinct_ordering(passes):
-
+\end{lstlisting}
 
 Any typical search algorithms such as beam search, genetic evolution, etc. would be implementable in this framework. However, due to time constraints, our results (below) were largely obtained with simple genetic search.
-\end{lstlisting}
 
 \subsubsection{Component \#2: A Framework for Applying an Algorithm to Select Passes}
 
-A typical code generation DBMS engine requires some finagling to get the execution time results reported back into the compilation pipeline. The issue is that compile-and-optimize level statistics will happen at a different time and call site than execution-time statistics. The combination of the above profiling subsystem and our framework for pass application is ongoing and is likely to extend beyond this course; the current state of the framework is only able to gather execution-time statistics for functions which are manually invoked. To better understand the last limitation, consider the following example of a typical \tpl plan for inserting into a table, which may have many functions:
+A typical code generation DBMS engine requires significant manual effort to get the execution time results reported back into the compilation pipeline. The issue is that compile-and-optimize level statistics will happen at a different time and call site than execution-time statistics. The combination of the above profiling subsystem and our framework for pass application is ongoing and is likely to extend beyond this course; the current state of the framework is only able to gather execution-time statistics for functions which are manually invoked. To better understand the last limitation, consider the following example of a typical \tpl plan for inserting into a table, which may have many functions:
 
 \begin{lstlisting}
 fun Setup() { ... }
@@ -328,11 +329,11 @@ fun Body() {
 fun Teardown() { ... }
 \end{lstlisting}
 
-Where the compiled \tpl program is invoked by explicitly executing \dbCode{Setup()}, \dbCode{Body()}, and \dbCode{Teardown()} in that order (modulo aborts or other exceptions). We can gather execution times for explicitly executed functions like \dbCode{Setup()}, \dbCode{Body()}, and \dbCode{Teardown()}, but we cannot gather times for the \dbCode{insertIntoTable()} function. Because the majority of our heuristics are currently focused on execution time, this is a significant and implementation-specific handicap to our approach, especially when we see a surprising amount of gain from optimizing these library functions instead of what is considered our "main" \tpl program. Please see a discussion of the results below.
+The compiled \tpl program is invoked by explicitly executing \dbCode{Setup()}, \dbCode{Body()}, and \dbCode{Teardown()} in that order (modulo aborts or other exceptions). We can gather execution times for explicitly executed functions like \dbCode{Setup()}, \dbCode{Body()}, and \dbCode{Teardown()}, but we cannot gather times for the \dbCode{insertIntoTable()} function. Because the majority of our heuristics are currently focused on execution time, this is a significant limitation that is specific to our approach. This issue becomes even more salient when we consider the fact that we observe disproportionate gains from optimizing these library functions, relative to what might be referred to as our "main" \tpl program. See below for further discussion of results.
 
 \subsubsection{Discussion}
 
-We would like to highlight the flexibility of this two-component approach in allowing feature-engineered passes to be treated the same way as regular LLVM passes, with an example shown below.
+We would like to highlight the flexibility of this two-component approach in allowing feature-engineered passes to be treated the same way as regular LLVM passes. An example is shown below.
 
 \begin{lstlisting}
 {"pmenon",
@@ -347,7 +348,7 @@ We would like to highlight the flexibility of this two-component approach in all
 }}, 
 \end{lstlisting}
 
-Additionally, in the DBMS context, care has to be taken to perform all profiling work in a "fake transaction", which is our phrase for a transaction that always gets aborted. This proved to be slightly tricky due to certain implementation details of how results were transmitted back from our JIT'ed code back into the network layer -- the code would normally write results back to the Postgres-compatible packet writer as they became available, for example. In this case, we benefit significantly from the concept of aborts being routine in a DBMS setting because it allows us to execute code that has side effects while essentially ignoring the side effects. It would be interesting to study how side effects are handled in other systems which attempt profile-guided optimization.
+Additionally, in the DBMS context, care has to be taken to perform all profiling work in a "fake transaction", which is our phrase for a transaction that always gets aborted. This proved to be slightly tricky due to certain implementation details of how results were transmitted from our JIT'ed code back into the network layer -- the code would normally write results back to the Postgres-compatible packet writer as they became available, for example. In this case, we benefit significantly from the concept of aborts being routine in a DBMS setting because it allows us to execute code that has side effects while essentially ignoring the side effects. It would be interesting to study how side effects are handled in other systems which attempt profile-guided optimization.
 
 To track whether an improvement was truly made, we always use the minimum -- noise is an issue, but noise cannot make slow code go faster, and over the many (hundreds/thousands) of iterations of our function pass applications, the minimum should win out. The algorithms that are used must ensure that mistakes can be recovered from, e.g., by allowing for arbitrary pass addition, mutation, or deletion.
 
@@ -357,12 +358,12 @@ To track whether an improvement was truly made, we always use the minimum -- noi
 
 \section{Experimental Setup}
 
-NoisePage is an end-to-end DBMS which you can connect to over SQL.
+NoisePage is an end-to-end DBMS which you can connect to over SQL. Consequently, we utilize the SQL API to perform the procedure necessary to run each test.
 
-To enable profiling, run \dbCode{SET profile\_enable = true;} over SQL. This will cause queries to undergo a fixed number of profiling runs before finally executing. Unfortunately, please note the following caveats:
+To enable profiling, we run \dbCode{SET profile\_enable = true;} over SQL. This will cause queries to undergo a fixed number of profiling runs before finally executing. We recognize the following limitations of the experimental setup used for our evaluation:
 \begin{itemize}
-    \item The number of profile runs and customization of profile strategies is just compiled in right now for rapid iteration, though there is no reason that can't be a setting.
-    \item The profiling subsystem is not yet ready to be hooked up, so some profile information is missing. However, all profile information that is present (execution times, optimize times, etc) and gathered is real.
+    \item The number of profile runs and customization of profile strategies is hard-coded into our implementation for rapid iteration. There is no fundamental reason that these settings cannot be dynamically configured.
+    \item The profiling subsystem is not yet ready to be integrated with the pass exploration framework. For this reason, profile information is neither as comprehensive nor as high-resolution as we originally intended. That said, all profile information used in our evaluation (execution times, optimize times, etc) is real, and was gathered via the \tpl function instrumentation technique described above.
 \end{itemize}
 
 Specifically, we use the following procedure to perform our evaluations:
@@ -410,7 +411,7 @@ INSERT INTO foo VALUES (1); /* 10x */
 
 Selected output from this run is provided in Listing \ref{lst:simplenoopt}. Full output is provided with our code submission.
 
-\textbf{Discussion} Inserting into a SQL table is such a lightweight operation that it was never profitable from an execution time standpoint to apply any optimizations to it (the \lstinline{loop-unroll-and-jam} was just random noise). We will see if the expert configuration performs any better. \linebreak
+\textbf{Discussion} Inserting into a SQL table is such a lightweight operation that it was never profitable from an execution time standpoint to apply any optimizations to it (the \lstinline{loop-unroll-and-jam} was just random noise). We will see if the expert configuration performs any better. \\
 
 The next listing presents a subset of the results when run with \textbf{expert optimizations} applied. The full procedure used to produce this run is as follows:
 \begin{lstlisting}
@@ -432,19 +433,19 @@ The first listing presents a subset of the results when run with \textbf{no opti
 \begin{lstlisting}
 // Load TPC-C with OLTPBenchmark --create=true --load=true
 SET profile_enable = true;
-SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE ‘a%’ ORDER BY C_FIRST; /* 10x */
+SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE 'a%' ORDER BY C_FIRST; /* 10x */
 \end{lstlisting}
 
 Selected output from this run is provided in Listing \ref{lst:tpccnoopt}. Full output is provided with our code submission.
 
-\textbf{Discussion} We have a similar negative result where no particular run was very profitable. \linebreak
+\textbf{Discussion} We have a similar negative result where no particular run was very profitable. \\
 
 Finally, the next listing presents a subset of the results when run with \textbf{expert optimizations} applied. The full procedure used to produce this run is as follows:
 \begin{lstlisting}
 // Load TPC-C with OLTPBenchmark --create=true --load=true
 SET pmenon_enable = true;
 SET profile_enable = true;
-SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE ‘a%’ ORDER BY C_FIRST; /* 10x */
+SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE 'a%' ORDER BY C_FIRST; /* 10x */
 \end{lstlisting}
 
 Selected output from this run is provided in Listing \ref{lst:tpccexpertopt}. Full output is provided with our code submission.
