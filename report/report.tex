@@ -399,16 +399,131 @@ Please see the \textit{745\_logs/} folder (provided with our code submission) fo
 
 \subsection{SIMPLE INSERT}
 
-For a demonstration of our framework, we utilize an extremely simple insertion query: \dbCode{INSERT INTO foo VALUES (1);}.
+For an initial demonstration of our framework, we utilize an extremely simple insertion query: \dbCode{INSERT INTO foo VALUES (1);}.
 
 The first listing presents a subset of the results when run with \textbf{no optimizations} applied. The full procedure used to produce this run is as follows:
 \begin{lstlisting}
 CREATE TABLE foo (a INT);
 SET profile_enable = true;
 INSERT INTO foo VALUES (1); /* 10x */
-\end{lstlisting}  
+\end{lstlisting}
 
+Selected output from this run is provided in Listing \ref{lst:simplenoopt}. Full output is provided with our code submission.
+
+\textbf{Discussion} Inserting into a SQL table is such a lightweight operation that it was never profitable from an execution time standpoint to apply any optimizations to it (the \lstinline{loop-unroll-and-jam} was just random noise). We will see if the expert configuration performs any better. \linebreak
+
+The next listing presents a subset of the results when run with \textbf{expert optimizations} applied. The full procedure used to produce this run is as follows:
 \begin{lstlisting}
+CREATE TABLE foo (a INT);
+SET pmenon_enable = true;
+SET profile_enable = true;
+INSERT INTO foo VALUES (1); /* 10x */
+\end{lstlisting}
+
+Selected output from this run is provided in Listing \ref{lst:simpleexpertopt}. Full output is provided with our code submission.
+
+\textbf{Discussion} As stated above, it was never profitable to apply any optimizations to it -- the timings for the expert picks and the search algorithm that attempted to iterate on the expert picks both did not find any significantly useful optimizations, even though the expert picks reduced the instruction count. If anything, the expert picks here were actually worse than doing anything at all: the expert picks have roughly double the optimization time, taking 0.00025 seconds more.
+
+\subsection{TPC-C PAYMENT'S SELECT CUSTOMER}
+
+We now examine a more complicated case, borrowing one of the queries executed by the TPC-C \cite{tpcc} PAYMENT transaction. TPC-C is a well-known database benchmark for OLTP workloads. We load with scale-factor 5.
+
+The first listing presents a subset of the results when run with \textbf{no optimizations} applied. The full procedure used to produce this run is as follows:
+\begin{lstlisting}
+// Load TPC-C with OLTPBenchmark --create=true --load=true
+SET profile_enable = true;
+SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE ‘a%’ ORDER BY C_FIRST; /* 10x */
+\end{lstlisting}
+
+Selected output from this run is provided in Listing \ref{lst:tpccnoopt}. Full output is provided with our code submission.
+
+\textbf{Discussion} We have a similar negative result where no particular run was very profitable. \linebreak
+
+Finally, the next listing presents a subset of the results when run with \textbf{expert optimizations} applied. The full procedure used to produce this run is as follows:
+\begin{lstlisting}
+// Load TPC-C with OLTPBenchmark --create=true --load=true
+SET pmenon_enable = true;
+SET profile_enable = true;
+SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE ‘a%’ ORDER BY C_FIRST; /* 10x */
+\end{lstlisting}
+
+Selected output from this run is provided in Listing \ref{lst:tpccexpertopt}. Full output is provided with our code submission.
+
+\textbf{Discussion} Similarly, the expert picks take 2-3x longer to optimize at no appreciable consistent benefit to execution time. The expert picks do lower the instruction count though.
+
+%% ==================================================================
+%% DISCUSSION, SURPRISES, AND LESSONS LEARNED
+%% ==================================================================
+
+\section{Discussion, Surprises, and Lessons Learned}
+
+Discussion To summarize the 4 discussion points above (2 x \dbCode{INSERT}, 2 x \dbCode{SELECT}), \textbf{there was no observed appreciable benefit to applying transform passes} for OLTP workloads. Other tests that were more OLAP in nature such as \dbCode{SELECT avg(i\_price) FROM item}, which scans across 100k entries, also showed negligible benefit. The expert passes were quite consistent in reducing instruction count, but it did not translate to any kind of noticeable speedup. There are two possible takeaways, which is that for typical SQL queries:
+\begin{itemize}
+    \item The LLVM transform passes are mostly not profitable, so don't bother with any of them.
+    \item The LLVM transform passes are mostly not profitable, but are very cheap to run (twice as long optimizing is still fractions upon fractions of a second), so you might as well do them just in case.
+\end{itemize}
+
+A different interpretation of the results may be that the NoisePage DBMS does not expose sufficient information to the compiler to optimize its workloads. We expect that the hand-picked passes that the expert used were indeed very effective for their use-case, where data was represented as essentially raw arrays in memory and were manipulated more directly. However, in integrating their work to our NoisePage DBMS, every tuple of data is now hidden behind a function call which performs the necessary concurrency control checks, and therefore it may have been an abstraction through which the LLVM transform passes were not able to optimize.
+
+Additionally, we found that most of the time spent optimizing a \tpl program was not in the directly source-visible functions but rather in all of the supporting functions that are builtin to the \tpl language. It is not clear whether optimizations are one-size fits all for all kinds of workloads, but pre-compiling these into a separate library and finding a way to link them is another possible source of optimization time savings.
+
+One lesson that we learned from the experience in general is the distinction between a high-level design description of a solution and the development effort required to implement the solution. Near the midpoint of the project, the TUM group published the paper describing the tailored profiling technique and its applications to profile collection across abstraction levels. With the design description provided in this paper, we assumed that completing our own implementation of the technique in our profiling subsystem would prove relatively simple. This assumption proved to be incorrect. Although the core idea underlying tailored profiling, the tagging dictionary, is a simple concept, we found that populating the dictionary requires significant additions to the existing code generation and compilation infrastructure in NoisePage. The difference between the level of implementation difficulty reported in the original paper \cite{beischl21} and our own experience is the result of differences in execution engine architectures. While both Umbra \cite{umbra} and NoisePage implement data-centric code-generation engines, Umbra's design is more amenable to the addition of support for tag collection.
+
+%% ==================================================================
+%% CONCLUSION AND FUTURE WORK
+%% ==================================================================
+
+\section{Conclusion and Future Work}
+
+In this section we present our conclusions and some potential directions for future work.
+
+\subsection{Conclusions}
+
+We identify the following technical conclusions from this project:
+\begin{itemize}
+    \item We now know how to implement a profiling subsystem via tailored profiling in NoisePage. More generally, we better understand the nuances involved in lowering and preserving useful abstractions in systems with multiple levels of domain-specific intermediate representations.
+    \item We began with the thesis of, "it may be profitable to apply different LLVM transformation passes (to different functions in the same program) in a profile-guided way to hyper-optimize a specific program".
+    \item We conclude that, at least in the NoisePage DBMS as it integrates \tpl today, you might as well not apply any optimization passes at all. You'll halve the time spent optimizing (microseconds range) and have essentially the same execution time.
+\end{itemize}
+
+\subsection{Future Work}
+
+We identify the following potential directions for future work:
+\begin{itemize}
+    \item Currently, our profiling subsystem uses one of the readily available kernel time sources (Linux's \lstinline{CLOCK_MONOTONIC_RAW}) to record timestamps for profile samples. In their description of tailored profiling, Beishcl et al. claim that none of the time sources exposed by the Linux kernel provide sample timestamps that are sufficiently accurate \cite{beischl21}. To address this issue, the authors apply a patch to the Linux kernel to expose the processor's timestamp counter register (the value read by \lstinline{RDTSC} on x86) value in the profile samples written by perf. They subsequently map this timestamp counter to a wall-clock time with the help of a kernel module \cite{beischl21}. Future work on our profiling subsystem might include a more robust evaluation of the distribution of profile timestamps to determine if a similar approach might be necessary in our system. 
+    \item The current implementation of our profiling subsystem adopts a simple configuration in which we sample hardware instruction retirement events. However, now that we have the infrastructure in place, extending the system to sample different events and record additional data with each sample is straightforward. This presents significant opportunities for future work. For instance, Beischel et al. generate profiles for memory access patterns by sampling on memory instruction retirement events (\lstinline{MEM_INST_RETIRED.ALL_LOADS}) \cite{beischl21}. Cache performance analysis should also be possible by sampling on the available cache reference (\lstinline{PERF_COUNT_HW_CACHE_REFERENCES}) and cache miss (\lstinline{PERF_COUNT_HW_CACHE_MISSES}) events.
+    \item The current profiling framework for determining the optimal set of LLVM passes for a particular query has the ability to support many different kinds of search algorithms. Given a heuristic function that includes a combination of different profiling data points, such as memory references and execution times for different operators, it is possible to exploit the framework and implement many different search algorithms, then compare their results.
+    \item The LLVM program that we currently optimize (which is generated in \tpl and lowered to LLVM IR) spends a significant proportion of its overall runtime in builtin library functions, such as \dbCode{tableInsert()}, \dbCode{projectedRowSetInt()}, \dbCode{joinHashTableInit()}, etc. Optimizing these builtin functions take a bulk of the optimization time. Therefore, it may be the case that we can pre-optimize just these functions in a one-size-fits-all manner and observe benefits similar to dynamic optimization without the associated runtime overhead.
+\end{itemize}
+
+%% ==================================================================
+%% WORK DISTRIBUTION
+%% ==================================================================
+
+\section{Work Distribution}
+
+All members of our group contributed equally to this project.
+
+%% ==================================================================
+%% BIBLIOGRAPHY
+%% ==================================================================
+
+% NOTE: Had to add this mysterious command to compile...
+\newcommand{\newblock}{}
+
+\newpage
+\balance
+\bibliographystyle{abbrv}
+\bibliography{report}
+
+%% ==================================================================
+%% APPENDIX
+%% ==================================================================
+
+\appendix
+\onecolumn
+
+\begin{lstlisting}[caption={Results of Query \dbCode{INSERT INTO foo VALUES (1)} with No Optimizations}, label={lst:simplenoopt}]
 > grep -A 4 original: foo_insert_baseline.txt 
 |----| Agg original: [34 insts, 256798 opt ns, 6275 exec ns] []
 |----| Agg last: [34 insts, 282244 opt ns, 6868 exec ns] [nd-correlated-value-propagation;]
@@ -471,17 +586,9 @@ INSERT INTO foo VALUES (1); /* 10x */
 |----| Agg max: [31 insts, 351603 opt ns, 9967 exec ns] [aggressive-instcombine;]
 \end{lstlisting}
 
-\textbf{Discussion} Inserting into a SQL table is such a lightweight operation that it was never profitable from an execution time standpoint to apply any optimizations to it (the \lstinline{loop-unroll-and-jam} was just random noise). We will see if the expert configuration performs any better.
+\clearpage
 
-The next listing presents a subset of the results when run with \textbf{expert optimizations} applied. The full procedure used to produce this run is as follows:
-\begin{lstlisting}
-CREATE TABLE foo (a INT);
-SET pmenon_enable = true;
-SET profile_enable = true;
-INSERT INTO foo VALUES (1); /* 10x */
-\end{lstlisting}
-
-\begin{lstlisting}
+\begin{lstlisting}[caption={Results of Query \dbCode{INSERT INTO foo VALUES (1)} with Expert Optimizations},label={lst:simpleexpertopt}]
 > grep -A 4 original: foo_insert_expert.txt  
 |----| Agg original: [30 insts, 440741 opt ns, 6378 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
 |----| Agg last: [30 insts, 483915 opt ns, 7734 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;nd-loop-inst-simplify;]
@@ -544,20 +651,9 @@ INSERT INTO foo VALUES (1); /* 10x */
 |----| Agg max: [30 insts, 420455 opt ns, 20389 exec ns] [aggressive-instcombine;gvn;simplifycfg;adce;simplifycfg;]
 \end{lstlisting}
 
-\textbf{Discussion} As stated above, it was never profitable to apply any optimizations to it -- the timings for the expert picks and the search algorithm that attempted to iterate on the expert picks both did not find any significantly useful optimizations, even though the expert picks reduced the instruction count. If anything, the expert picks here were actually worse than doing anything at all: the expert picks have roughly double the optimization time, taking 0.00025 seconds more.
+\clearpage
 
-\subsection{TPC-C PAYMENT’S SELECT CUSTOMER}
-
-We now examine a more complicated case, borrowing one of the queries executed by the TPC-C \cite{tpcc} PAYMENT transaction. TPC-C is a well-known database benchmark for OLTP workloads. We load with scale-factor 5.
-
-The first listing presents a subset of the results when run with \textbf{no optimizations} applied. The full procedure used to produce this run is as follows:
-\begin{lstlisting}
-/* Load TPC-C with OLTPBenchmark --create=true --load=true. */
-SET profile_enable = true;
-SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE ‘a%’ ORDER BY C_FIRST; /* 10x */
-\end{lstlisting}
-
-\begin{lstlisting}
+\begin{lstlisting}[caption={Results of TPC-C Query with No Optimizations},label={lst:tpccnoopt}]
 > grep -A 4 original: tpcc_select_baseline.txt 
 |----| Agg original: [127 insts, 166348 opt ns, 31350926 exec ns] []
 |----| Agg last: [127 insts, 160700 opt ns, 31926567 exec ns] []
@@ -620,17 +716,9 @@ SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, 
 |----| Agg max: [127 insts, 373848 opt ns, 33946677 exec ns] [dse;]
 \end{lstlisting}
 
-\textbf{Discussion} We have a similar negative result where no particular run was very profitable.
+\clearpage
 
-Finally, the next listing presents a subset of the results when run with \textbf{expert optimizations} applied. The full procedure used to produce this run is as follows:
-\begin{lstlisting}
-/* Load TPC-C with OLTPBenchmark --create=true --load=true. */
-SET pmenon_enable = true;
-SET profile_enable = true;
-SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE ‘a%’ ORDER BY C_FIRST; /* 10x */
-\end{lstlisting}
-
-\begin{lstlisting}
+\begin{lstlisting}[caption={Results of TPC-C Query with Expert Optimizations},label={lst:tpccexpertopt}]
 > grep -A 4 original: tpcc_select_expert.txt  
 |----| Agg original: [113 insts, 599769 opt ns, 31279871 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
 |----| Agg last: [113 insts, 592277 opt ns, 32964854 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
@@ -692,72 +780,5 @@ SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, 
 |----| Agg mean: [113 insts, 588220 opt ns, 31849649 exec ns]
 |----| Agg max: [113 insts, 592411 opt ns, 36662351 exec ns] [aggressive-instcombine;reassociate;gvn;adce;simplifycfg;]
 \end{lstlisting}
-
-\textbf{Discussion} Similarly, the expert picks take 2-3x longer to optimize at no appreciable consistent benefit to execution time. The expert picks do lower the instruction count though.
-
-%% ==================================================================
-%% DISCUSSION, SURPRISES, AND LESSONS LEARNED
-%% ==================================================================
-
-\section{Discussion, Surprises, and Lessons Learned}
-
-Discussion To summarize the 4 discussion points above (2 x \dbCode{INSERT}, 2 x \dbCode{SELECT}), \textbf{there was no observed appreciable benefit to applying transform passes} for OLTP workloads. Other tests that were more OLAP in nature such as \dbCode{SELECT avg(i\_price) FROM item}, which scans across 100k entries, also showed negligible benefit. The expert passes were quite consistent in reducing instruction count, but it did not translate to any kind of noticeable speedup. There are two possible takeaways, which is that for typical SQL queries:
-\begin{itemize}
-    \item The LLVM transform passes are mostly not profitable, so don't bother with any of them.
-    \item The LLVM transform passes are mostly not profitable, but are very cheap to run (twice as long optimizing is still fractions upon fractions of a second), so you might as well do them just in case.
-\end{itemize}
-
-A different interpretation of the results may be that the NoisePage DBMS does not expose sufficient information to the compiler to optimize its workloads. We expect that the hand-picked passes that the expert used were indeed very effective for their use-case, where data was represented as essentially raw arrays in memory and were manipulated more directly. However, in integrating their work to our NoisePage DBMS, every tuple of data is now hidden behind a function call which performs the necessary concurrency control checks, and therefore it may have been an abstraction through which the LLVM transform passes were not able to optimize.
-
-Additionally, we found that most of the time spent optimizing a \tpl program was not in the directly source-visible functions but rather in all of the supporting functions that are builtin to the \tpl language. It is not clear whether optimizations are one-size fits all for all kinds of workloads, but pre-compiling these into a separate library and finding a way to link them is another possible source of optimization time savings.
-
-One lesson that we learned from the experience in general is the distinction between a high-level design description of a solution and the development effort required to implement the solution. Near the midpoint of the project, the TUM group published the paper describing the tailored profiling technique and its applications to profile collection across abstraction levels. With the design description provided in this paper, we assumed that completing our own implementation of the technique in our profiling subsystem would prove relatively simple. This assumption proved to be incorrect. Although the core idea underlying tailored profiling, the tagging dictionary, is a simple concept, we found that populating the dictionary requires significant additions to the existing code generation and compilation infrastructure in NoisePage. The difference between the level of implementation difficulty reported in the original paper \cite{beischl21} and our own experience is the result of differences in execution engine architectures. While both Umbra \cite{umbra} and NoisePage implement data-centric code-generation engines, Umbra’s design is more amenable to the addition of support for tag collection.
-
-%% ==================================================================
-%% CONCLUSION AND FUTURE WORK
-%% ==================================================================
-
-\section{Conclusion and Future Work}
-
-In this section we present our conclusions and some potential directions for future work.
-
-\subsection{Conclusions}
-
-We identify the following technical conclusions from this project:
-\begin{itemize}
-    \item We now know how to implement a profiling subsystem via tailored profiling in NoisePage. More generally, we better understand the nuances involved in lowering and preserving useful abstractions in systems with multiple levels of domain-specific intermediate representations.
-    \item We began with the thesis of, "it may be profitable to apply different LLVM transformation passes (to different functions in the same program) in a profile-guided way to hyper-optimize a specific program".
-    \item We conclude that, at least in the NoisePage DBMS as it integrates \tpl today, you might as well not apply any optimization passes at all. You'll halve the time spent optimizing (microseconds range) and have essentially the same execution time.
-\end{itemize}
-
-\subsection{Future Work}
-
-We identify the following potential directions for future work:
-\begin{itemize}
-    \item Currently, our profiling subsystem uses one of the readily available kernel time sources (Linux's \lstinline{CLOCK_MONOTONIC_RAW}) to record timestamps for profile samples. In their description of tailored profiling, Beishcl et al. claim that none of the time sources exposed by the Linux kernel provide sample timestamps that are sufficiently accurate \cite{beischl21}. To address this issue, the authors apply a patch to the Linux kernel to expose the processor's timestamp counter register (the value read by \lstinline{RDTSC} on x86) value in the profile samples written by perf. They subsequently map this timestamp counter to a wall-clock time with the help of a kernel module \cite{beischl21}. Future work on our profiling subsystem might include a more robust evaluation of the distribution of profile timestamps to determine if a similar approach might be necessary in our system. 
-    \item The current implementation of our profiling subsystem adopts a simple configuration in which we sample hardware instruction retirement events. However, now that we have the infrastructure in place, extending the system to sample different events and record additional data with each sample is straightforward. This presents significant opportunities for future work. For instance, Beischel et al. generate profiles for memory access patterns by sampling on memory instruction retirement events (\lstinline{MEM_INST_RETIRED.ALL_LOADS}) \cite{beischl21}. Cache performance analysis should also be possible by sampling on the available cache reference (\lstinline{PERF_COUNT_HW_CACHE_REFERENCES}) and cache miss (\lstinline{PERF_COUNT_HW_CACHE_MISSES}) events.
-    \item The current profiling framework for determining the optimal set of LLVM passes for a particular query has the ability to support many different kinds of search algorithms. Given a heuristic function that includes a combination of different profiling data points, such as memory references and execution times for different operators, it is possible to exploit the framework and implement many different search algorithms, then compare their results.
-    \item The LLVM program that we currently optimize (which is generated in \tpl and lowered to LLVM IR) spends a significant proportion of its overall runtime in builtin library functions, such as \dbCode{tableInsert()}, \dbCode{projectedRowSetInt()}, \dbCode{joinHashTableInit()}, etc. Optimizing these builtin functions take a bulk of the optimization time. Therefore, it may be the case that we can pre-optimize just these functions in a one-size-fits-all manner and observe benefits similar to dynamic optimization without the associated runtime overhead.
-\end{itemize}
-
-%% ==================================================================
-%% WORK DISTRIBUTION
-%% ==================================================================
-
-\section{Work Distribution}
-
-All members of our group contributed equally to this project.
-
-%% ==================================================================
-%% BIBLIOGRAPHY
-%% ==================================================================
-
-% NOTE: Had to add this mysterious command to compile...
-\newcommand{\newblock}{}
-
-\newpage
-\balance
-\bibliographystyle{abbrv}
-\bibliography{report}
 
 \end{document}
