@@ -76,6 +76,7 @@
 \usepackage{braket}
 \usepackage{balance}
 \usepackage{listings}
+\usepackage{enumitem}
 
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -273,7 +274,7 @@ We utilize a tagging dictionary with three levels to record the translations tha
 
 \subsubsection{Profile Sample Collection}
 
-We utilize the Linux perf API to collect an execution profile for the JIT-compiled query as it is executed. We utilize event-based sampling on instruction retirement (\dbCode{INST\_RETIRED.PREC\_DIST}) events. A sample is collected every 5,000 events. To ensure the accuracy of the collected samples, we request precise instruction pointers (0 skid) in our samples; this enables the Processor Event Based Sampling (PEBS) feature on Intel platforms \cite{intelmanual}. This sampling configuration is the same as that utilized by Beischl et al. in their proof-of-concept \cite{beischl21}.
+We utilize the Linux perf API to collect an execution profile for the JIT-compiled query as it is executed. We utilize event-based sampling on instruction retirement (\lstinline{INST_RETIRED.PREC_DIST}) events. A sample is collected every 5,000 events. To ensure the accuracy of the collected samples, we request precise instruction pointers (0 skid) in our samples; this enables the Processor Event Based Sampling (PEBS) feature on Intel platforms \cite{intelmanual}. This sampling configuration is the same as that utilized by Beischl et al. in their proof-of-concept \cite{beischl21}.
 
 Samples are written to a memory-mapped ring buffer by the kernel at the specified interval. We read the raw samples from this ring buffer and serialize them to a JSON file for subsequent processing.
 
@@ -327,7 +328,7 @@ fun Body() {
 fun Teardown() { ... }
 \end{lstlisting}
 
-Where the compiled \tpl program is invoked by explicitly executing \dbCode{Setup()}, \dbCode{Body()}, and \dbCode{Teardown()} in that order (modulo aborts or other exceptions). We can gather execution times for explicitly executed functions like \dbCode{Setup()}, \dbCode{Body()}, and \dbCode{Teardown()}, but we cannot gather times for the \dbCode{insertIntoTable()} function. Because the majority of our heuristics are currently focused on execution time, this is a significant and implementation-specific handicap to our approach, especially when we see a surprising amount of gain from optimizing these library functions instead of what is considered our “main” TPL program. Please see a discussion of the results below.
+Where the compiled \tpl program is invoked by explicitly executing \dbCode{Setup()}, \dbCode{Body()}, and \dbCode{Teardown()} in that order (modulo aborts or other exceptions). We can gather execution times for explicitly executed functions like \dbCode{Setup()}, \dbCode{Body()}, and \dbCode{Teardown()}, but we cannot gather times for the \dbCode{insertIntoTable()} function. Because the majority of our heuristics are currently focused on execution time, this is a significant and implementation-specific handicap to our approach, especially when we see a surprising amount of gain from optimizing these library functions instead of what is considered our "main" \tpl program. Please see a discussion of the results below.
 
 \subsubsection{Discussion}
 
@@ -356,6 +357,38 @@ To track whether an improvement was truly made, we always use the minimum -- noi
 
 \section{Experimental Setup}
 
+NoisePage is an end-to-end DBMS which you can connect to over SQL.
+
+To enable profiling, run \dbCode{SET profile\_enable = true;} over SQL. This will cause queries to undergo a fixed number of profiling runs before finally executing. Unfortunately, please note the following caveats:
+\begin{itemize}
+    \item The number of profile runs and customization of profile strategies is just compiled in right now for rapid iteration, though there is no reason that can't be a setting.
+    \item The profiling subsystem is not yet ready to be hooked up, so some profile information is missing. However, all profile information that is present (execution times, optimize times, etc) and gathered is real.
+\end{itemize}
+
+Specifically, we use the following procedure to perform our evaluations:
+
+\begin{itemize}
+    \item (Optional) For a more detailed trace of what the algorithms are doing, look for and add/remove the defines \lstinline{#define NOPRINT} and \lstinline{#define NOPRINT2} in \textit{llvm\_optimizer.cpp} and \textit{executable\_query.cpp} respectively.
+    \item Perform any schema setup, data loading, etc.
+    \begin{itemize}
+        \item Trivial example: \dbCode{CREATE TABLE foo (a int);}
+        \item Involved example: Load TPC-C \cite{tpcc}, for example by using OLTPBenchmark \cite{oltpbench}
+    \end{itemize}
+    \item Enable profiling.
+    \begin{itemize}
+        \item Run \dbCode{SET profile\_enable = true;}
+    \end{itemize}
+    \item (Optional) Switch the baseline evaluation from \dbCode{NOOP} (running without optimizations) to \dbCode{PMENON} (expert configuration).
+    \begin{itemize}
+        \item Run \dbCode{SET pmenon\_enable = true;}
+    \end{itemize}
+    \item Execute any SQL queries. The profiling process prints to standard output.
+    \begin{itemize}
+        \item Unfortunately, due to time constraints, there are no visualizers. You can CTRL-F for \lstinline{PASS MARKER} to quickly jump to the baseline and/or final result.
+        \item The profiling data resets between SQL queries.
+    \end{itemize}
+\end{itemize}
+
 %% ==================================================================
 %% EXPERIMENTAL EVALUATION
 %% ==================================================================
@@ -363,16 +396,49 @@ To track whether an improvement was truly made, we always use the minimum -- noi
 \section{Experimental Evaluation}
 
 %% ==================================================================
-%% SURPRISES AND LESSONS LEARNED
+%% DISCUSSION, SURPRISES, AND LESSONS LEARNED
 %% ==================================================================
 
-\section{Surprises and Lessons Learned}
+\section{Discussion, Surprises, and Lessons Learned}
+
+Discussion To summarize the 4 discussion points above (2 x \dbCode{INSERT}, 2 x \dbCode{SELECT}), \textbf{there was no observed appreciable benefit to applying transform passes} for OLTP workloads. Other tests that were more OLAP in nature such as \dbCode{SELECT avg(i\_price) FROM item}, which scans across 100k entries, also showed negligible benefit. The expert passes were quite consistent in reducing instruction count, but it did not translate to any kind of noticeable speedup. There are two possible takeaways, which is that for typical SQL queries:
+\begin{itemize}
+    \item The LLVM transform passes are mostly not profitable, so don't bother with any of them.
+    \item The LLVM transform passes are mostly not profitable, but are very cheap to run (twice as long optimizing is still fractions upon fractions of a second), so you might as well do them just in case.
+\end{itemize}
+
+A different interpretation of the results may be that the NoisePage DBMS does not expose sufficient information to the compiler to optimize its workloads. We expect that the hand-picked passes that the expert used were indeed very effective for their use-case, where data was represented as essentially raw arrays in memory and were manipulated more directly. However, in integrating their work to our NoisePage DBMS, every tuple of data is now hidden behind a function call which performs the necessary concurrency control checks, and therefore it may have been an abstraction through which the LLVM transform passes were not able to optimize.
+
+Additionally, we found that most of the time spent optimizing a \tpl program was not in the directly source-visible functions but rather in all of the supporting functions that are builtin to the \tpl language. It is not clear whether optimizations are one-size fits all for all kinds of workloads, but pre-compiling these into a separate library and finding a way to link them is another possible source of optimization time savings.
+
+One lesson that we learned from the experience in general is the distinction between a high-level design description of a solution and the development effort required to implement the solution. Near the midpoint of the project, the TUM group published the paper describing the tailored profiling technique and its applications to profile collection across abstraction levels. With the design description provided in this paper, we assumed that completing our own implementation of the technique in our profiling subsystem would prove relatively simple. This assumption proved to be incorrect. Although the core idea underlying tailored profiling, the tagging dictionary, is a simple concept, we found that populating the dictionary requires significant additions to the existing code generation and compilation infrastructure in NoisePage. The difference between the level of implementation difficulty reported in the original paper \cite{beischl21} and our own experience is the result of differences in execution engine architectures. While both Umbra \cite{umbra} and NoisePage implement data-centric code-generation engines, Umbra’s design is more amenable to the addition of support for tag collection.
 
 %% ==================================================================
 %% CONCLUSION AND FUTURE WORK
 %% ==================================================================
 
 \section{Conclusion and Future Work}
+
+In this section we present our conclusions and some potential directions for future work.
+
+\subsection{Conclusions}
+
+We identify the following technical conclusions from this project:
+\begin{itemize}
+    \item We now know how to implement a profiling subsystem via tailored profiling in NoisePage. More generally, we better understand the nuances involved in lowering and preserving useful abstractions in systems with multiple levels of domain-specific intermediate representations.
+    \item We began with the thesis of, "it may be profitable to apply different LLVM transformation passes (to different functions in the same program) in a profile-guided way to hyper-optimize a specific program".
+    \item We conclude that, at least in the NoisePage DBMS as it integrates \tpl today, you might as well not apply any optimization passes at all. You'll halve the time spent optimizing (microseconds range) and have essentially the same execution time.
+\end{itemize}
+
+\subsection{Future Work}
+
+We identify the following potential directions for future work:
+\begin{itemize}
+    \item Currently, our profiling subsystem uses one of the readily available kernel time sources (Linux's \lstinline{CLOCK_MONOTONIC_RAW}) to record timestamps for profile samples. In their description of tailored profiling, Beishcl et al. claim that none of the time sources exposed by the Linux kernel provide sample timestamps that are sufficiently accurate \cite{beischl21}. To address this issue, the authors apply a patch to the Linux kernel to expose the processor's timestamp counter register (the value read by \lstinline{RDTSC} on x86) value in the profile samples written by perf. They subsequently map this timestamp counter to a wall-clock time with the help of a kernel module \cite{beischl21}. Future work on our profiling subsystem might include a more robust evaluation of the distribution of profile timestamps to determine if a similar approach might be necessary in our system. 
+    \item The current implementation of our profiling subsystem adopts a simple configuration in which we sample hardware instruction retirement events. However, now that we have the infrastructure in place, extending the system to sample different events and record additional data with each sample is straightforward. This presents significant opportunities for future work. For instance, Beischel et al. generate profiles for memory access patterns by sampling on memory instruction retirement events (\lstinline{MEM_INST_RETIRED.ALL_LOADS}) \cite{beischl21}. Cache performance analysis should also be possible by sampling on the available cache reference (\lstinline{PERF_COUNT_HW_CACHE_REFERENCES}) and cache miss (\lstinline{PERF_COUNT_HW_CACHE_MISSES}) events.
+    \item The current profiling framework for determining the optimal set of LLVM passes for a particular query has the ability to support many different kinds of search algorithms. Given a heuristic function that includes a combination of different profiling data points, such as memory references and execution times for different operators, it is possible to exploit the framework and implement many different search algorithms, then compare their results.
+    \item The LLVM program that we currently optimize (which is generated in \tpl and lowered to LLVM IR) spends a significant proportion of its overall runtime in builtin library functions, such as \dbCode{tableInsert()}, \dbCode{projectedRowSetInt()}, \dbCode{joinHashTableInit()}, etc. Optimizing these builtin functions take a bulk of the optimization time. Therefore, it may be the case that we can pre-optimize just these functions in a one-size-fits-all manner and observe benefits similar to dynamic optimization without the associated runtime overhead.
+\end{itemize}
 
 %% ==================================================================
 %% WORK DISTRIBUTION
