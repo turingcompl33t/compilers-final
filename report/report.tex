@@ -312,6 +312,7 @@ def distinct_ordering(passes):
 
 
 Any typical search algorithms such as beam search, genetic evolution, etc. would be implementable in this framework. However, due to time constraints, our results (below) were largely obtained with simple genetic search.
+\end{lstlisting}
 
 \subsubsection{Component \#2: A Framework for Applying an Algorithm to Select Passes}
 
@@ -393,6 +394,306 @@ Specifically, we use the following procedure to perform our evaluations:
 %% ==================================================================
 
 \section{Experimental Evaluation}
+
+Please see the \textit{745\_logs/} folder (provided with our code submission) for the full details of each run, including IR and passes attempted. Note that each block of \lstinline{grep} output below is a separate run. The readings for \lstinline{Agg original} are actually the minimum timing from at least 100 warmup runs.
+
+\subsection{SIMPLE INSERT}
+
+For a demonstration of our framework, we utilize an extremely simple insertion query: \dbCode{INSERT INTO foo VALUES (1);}.
+
+The first listing presents a subset of the results when run with \textbf{no optimizations} applied. The full procedure used to produce this run is as follows:
+\begin{lstlisting}
+CREATE TABLE foo (a INT);
+SET profile_enable = true;
+INSERT INTO foo VALUES (1); /* 10x */
+\end{lstlisting}  
+
+\begin{lstlisting}
+> grep -A 4 original: foo_insert_baseline.txt 
+|----| Agg original: [34 insts, 256798 opt ns, 6275 exec ns] []
+|----| Agg last: [34 insts, 282244 opt ns, 6868 exec ns] [nd-correlated-value-propagation;]
+|----| Agg min: [34 insts, 256798 opt ns, 6275 exec ns] []
+|----| Agg mean: [31 insts, 299306 opt ns, 7228 exec ns]
+|----| Agg max: [34 insts, 299812 opt ns, 28324 exec ns] [loop-simplify;]
+--
+|----| Agg original: [34 insts, 256828 opt ns, 6438 exec ns] []
+|----| Agg last: [34 insts, 303660 opt ns, 7145 exec ns] [loop-unroll-and-jam;]
+|----| Agg min: [34 insts, 261061 opt ns, 6250 exec ns] []
+|----| Agg mean: [31 insts, 293810 opt ns, 7003 exec ns]
+|----| Agg max: [34 insts, 296564 opt ns, 24084 exec ns] [indvars;]
+--
+|----| Agg original: [34 insts, 265882 opt ns, 6290 exec ns] []
+|----| Agg last: [34 insts, 267068 opt ns, 6697 exec ns] [sccp;]
+|----| Agg min: [34 insts, 309038 opt ns, 6199 exec ns] [loop-unroll-and-jam;]
+|----| Agg mean: [31 insts, 291336 opt ns, 6963 exec ns]
+|----| Agg max: [34 insts, 263768 opt ns, 12179 exec ns] [simplifycfg;]
+--
+|----| Agg original: [34 insts, 258198 opt ns, 6306 exec ns] []
+|----| Agg last: [34 insts, 294683 opt ns, 7846 exec ns] [loop-deletion;]
+|----| Agg min: [34 insts, 258198 opt ns, 6306 exec ns] []
+|----| Agg mean: [31 insts, 294892 opt ns, 7073 exec ns]
+|----| Agg max: [34 insts, 339107 opt ns, 20196 exec ns] [indvars;]
+--
+|----| Agg original: [34 insts, 266314 opt ns, 6240 exec ns] []
+|----| Agg last: [34 insts, 286025 opt ns, 23367 exec ns] [loop-reduce;]
+|----| Agg min: [34 insts, 266314 opt ns, 6240 exec ns] []
+|----| Agg mean: [31 insts, 293613 opt ns, 7078 exec ns]
+|----| Agg max: [34 insts, 286025 opt ns, 23367 exec ns] [loop-reduce;]
+--
+|----| Agg original: [34 insts, 258549 opt ns, 6240 exec ns] []
+|----| Agg last: [34 insts, 297345 opt ns, 7028 exec ns] [indvars;]
+|----| Agg min: [34 insts, 258549 opt ns, 6240 exec ns] []
+|----| Agg mean: [31 insts, 308999 opt ns, 7254 exec ns]
+|----| Agg max: [34 insts, 280831 opt ns, 11527 exec ns] [memcpyopt;]
+--
+|----| Agg original: [34 insts, 256396 opt ns, 6298 exec ns] []
+|----| Agg last: [34 insts, 293989 opt ns, 6645 exec ns] [tailcallelim;]
+|----| Agg min: [34 insts, 256396 opt ns, 6298 exec ns] []
+|----| Agg mean: [31 insts, 296594 opt ns, 7144 exec ns]
+|----| Agg max: [34 insts, 271976 opt ns, 27775 exec ns] [loop-extract-single;]
+--
+|----| Agg original: [34 insts, 256615 opt ns, 6146 exec ns] []
+|----| Agg last: [31 insts, 349850 opt ns, 6607 exec ns] [instcombine;]
+|----| Agg min: [34 insts, 256615 opt ns, 6146 exec ns] []
+|----| Agg mean: [31 insts, 305433 opt ns, 7208 exec ns]
+|----| Agg max: [34 insts, 272923 opt ns, 21173 exec ns] [nd-early-cse;]
+--
+|----| Agg original: [34 insts, 263015 opt ns, 6191 exec ns] []
+|----| Agg last: [34 insts, 295891 opt ns, 6807 exec ns] [indvars;]
+|----| Agg min: [34 insts, 263015 opt ns, 6191 exec ns] []
+|----| Agg mean: [31 insts, 297585 opt ns, 7074 exec ns]
+|----| Agg max: [34 insts, 275287 opt ns, 23212 exec ns] [loop-extract-single;]
+--
+|----| Agg original: [34 insts, 256223 opt ns, 6252 exec ns] []
+|----| Agg last: [34 insts, 299607 opt ns, 7470 exec ns] [loop-deletion;]
+|----| Agg min: [34 insts, 256223 opt ns, 6252 exec ns] []
+|----| Agg mean: [31 insts, 295411 opt ns, 7015 exec ns]
+|----| Agg max: [31 insts, 351603 opt ns, 9967 exec ns] [aggressive-instcombine;]
+\end{lstlisting}
+
+\textbf{Discussion} Inserting into a SQL table is such a lightweight operation that it was never profitable from an execution time standpoint to apply any optimizations to it (the \lstinline{loop-unroll-and-jam} was just random noise). We will see if the expert configuration performs any better.
+
+The next listing presents a subset of the results when run with \textbf{expert optimizations} applied. The full procedure used to produce this run is as follows:
+\begin{lstlisting}
+CREATE TABLE foo (a INT);
+SET pmenon_enable = true;
+SET profile_enable = true;
+INSERT INTO foo VALUES (1); /* 10x */
+\end{lstlisting}
+
+\begin{lstlisting}
+> grep -A 4 original: foo_insert_expert.txt  
+|----| Agg original: [30 insts, 440741 opt ns, 6378 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [30 insts, 483915 opt ns, 7734 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;nd-loop-inst-simplify;]
+|----| Agg min: [30 insts, 440741 opt ns, 6378 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [30 insts, 437485 opt ns, 7276 exec ns]
+|----| Agg max: [30 insts, 470337 opt ns, 30682 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;instcombine;]
+--
+|----| Agg original: [30 insts, 432260 opt ns, 6524 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [30 insts, 451445 opt ns, 7381 exec ns] [aggressive-instcombine;dse;gvn;simplifycfg;adce;simplifycfg;die;]
+|----| Agg min: [30 insts, 441427 opt ns, 6338 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;die;]
+|----| Agg mean: [30 insts, 444231 opt ns, 7000 exec ns]
+|----| Agg max: [30 insts, 472348 opt ns, 8423 exec ns] [aggressive-instcombine;reassociate;gvn;adce;adce;simplifycfg;]
+--
+|----| Agg original: [30 insts, 436893 opt ns, 6454 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [30 insts, 429724 opt ns, 20242 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;]
+|----| Agg min: [30 insts, 429589 opt ns, 6412 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;]
+|----| Agg mean: [30 insts, 434228 opt ns, 7237 exec ns]
+|----| Agg max: [30 insts, 481456 opt ns, 28286 exec ns] [aggressive-instcombine;reassociate;gvn;loop-rotate;adce;simplifycfg;]
+--
+|----| Agg original: [30 insts, 436984 opt ns, 6395 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [30 insts, 437597 opt ns, 7061 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg min: [30 insts, 436984 opt ns, 6395 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [30 insts, 436959 opt ns, 7247 exec ns]
+|----| Agg max: [30 insts, 429990 opt ns, 30359 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+--
+|----| Agg original: [30 insts, 435122 opt ns, 6494 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [30 insts, 474955 opt ns, 7245 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;loop-unroll;]
+|----| Agg min: [30 insts, 465651 opt ns, 6398 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;loop-unroll;]
+|----| Agg mean: [30 insts, 451786 opt ns, 7045 exec ns]
+|----| Agg max: [30 insts, 436202 opt ns, 11677 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+--
+|----| Agg original: [30 insts, 483427 opt ns, 6613 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [30 insts, 481878 opt ns, 7298 exec ns] [aggressive-instcombine;reassociate;gvn;sccp;adce;simplifycfg;]
+|----| Agg min: [30 insts, 473741 opt ns, 6593 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [30 insts, 449560 opt ns, 7289 exec ns]
+|----| Agg max: [30 insts, 438422 opt ns, 23752 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+--
+|----| Agg original: [34 insts, 276481 opt ns, 6601 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [34 insts, 268709 opt ns, 7210 exec ns] []
+|----| Agg min: [34 insts, 278470 opt ns, 6425 exec ns] [sink;]
+|----| Agg mean: [31 insts, 299769 opt ns, 7145 exec ns]
+|----| Agg max: [34 insts, 267244 opt ns, 20372 exec ns] [sroa;]
+--
+|----| Agg original: [30 insts, 450926 opt ns, 6739 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [34 insts, 408464 opt ns, 6631 exec ns] [reassociate;gvn;simplifycfg;adce;simplifycfg;loop-unswitch;loop-rotate;]
+|----| Agg min: [34 insts, 446876 opt ns, 6301 exec ns] [reassociate;gvn;simplifycfg;adce;simplifycfg;loop-unswitch;]
+|----| Agg mean: [30 insts, 414105 opt ns, 7265 exec ns]
+|----| Agg max: [34 insts, 420268 opt ns, 28047 exec ns] [dse;reassociate;gvn;simplifycfg;adce;simplifycfg;loop-unswitch;constprop;]
+--
+|----| Agg original: [30 insts, 432644 opt ns, 6521 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [30 insts, 445230 opt ns, 7051 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;die;]
+|----| Agg min: [30 insts, 507212 opt ns, 6465 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;die;nd-correlated-value-propagation;]
+|----| Agg mean: [30 insts, 470494 opt ns, 7065 exec ns]
+|----| Agg max: [30 insts, 499629 opt ns, 8474 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;die;nd-correlated-value-propagation;loop-unroll;]
+--
+|----| Agg original: [30 insts, 432133 opt ns, 6410 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [34 insts, 361679 opt ns, 6937 exec ns] [simplifycfg;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg min: [30 insts, 432133 opt ns, 6410 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [30 insts, 438346 opt ns, 7171 exec ns]
+|----| Agg max: [30 insts, 420455 opt ns, 20389 exec ns] [aggressive-instcombine;gvn;simplifycfg;adce;simplifycfg;]
+\end{lstlisting}
+
+\textbf{Discussion} As stated above, it was never profitable to apply any optimizations to it -- the timings for the expert picks and the search algorithm that attempted to iterate on the expert picks both did not find any significantly useful optimizations, even though the expert picks reduced the instruction count. If anything, the expert picks here were actually worse than doing anything at all: the expert picks have roughly double the optimization time, taking 0.00025 seconds more.
+
+\subsection{TPC-C PAYMENT’S SELECT CUSTOMER}
+
+We now examine a more complicated case, borrowing one of the queries executed by the TPC-C \cite{tpcc} PAYMENT transaction. TPC-C is a well-known database benchmark for OLTP workloads. We load with scale-factor 5.
+
+The first listing presents a subset of the results when run with \textbf{no optimizations} applied. The full procedure used to produce this run is as follows:
+\begin{lstlisting}
+/* Load TPC-C with OLTPBenchmark --create=true --load=true. */
+SET profile_enable = true;
+SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE ‘a%’ ORDER BY C_FIRST; /* 10x */
+\end{lstlisting}
+
+\begin{lstlisting}
+> grep -A 4 original: tpcc_select_baseline.txt 
+|----| Agg original: [127 insts, 166348 opt ns, 31350926 exec ns] []
+|----| Agg last: [127 insts, 160700 opt ns, 31926567 exec ns] []
+|----| Agg min: [127 insts, 202609 opt ns, 31267132 exec ns] [memcpyopt;]
+|----| Agg mean: [118 insts, 231719 opt ns, 32194295 exec ns]
+|----| Agg max: [127 insts, 186947 opt ns, 41145153 exec ns] [loop-extract-single;]
+--
+|----| Agg original: [127 insts, 163735 opt ns, 31510605 exec ns] []
+|----| Agg last: [127 insts, 249558 opt ns, 32673851 exec ns] [gvn-no-load-elimination;]
+|----| Agg min: [127 insts, 239359 opt ns, 31479698 exec ns] [gvn-no-load-elimination;]
+|----| Agg mean: [119 insts, 238915 opt ns, 32050176 exec ns]
+|----| Agg max: [127 insts, 191890 opt ns, 33436675 exec ns] [nd-early-cse;]
+--
+|----| Agg original: [127 insts, 165471 opt ns, 31439411 exec ns] []
+|----| Agg last: [127 insts, 210252 opt ns, 32901905 exec ns] [loop-reduce;]
+|----| Agg min: [127 insts, 165471 opt ns, 31439411 exec ns] []
+|----| Agg mean: [118 insts, 237162 opt ns, 32481112 exec ns]
+|----| Agg max: [127 insts, 234765 opt ns, 35715501 exec ns] [loop-unswitch;]
+--
+|----| Agg original: [127 insts, 158879 opt ns, 31426036 exec ns] []
+|----| Agg last: [118 insts, 408160 opt ns, 32142559 exec ns] [instcombine;]
+|----| Agg min: [127 insts, 244577 opt ns, 31272207 exec ns] [loop-unroll-and-jam;]
+|----| Agg mean: [116 insts, 258419 opt ns, 31995727 exec ns]
+|----| Agg max: [127 insts, 168425 opt ns, 34368579 exec ns] []
+--
+|----| Agg original: [127 insts, 161068 opt ns, 31267143 exec ns] []
+|----| Agg last: [127 insts, 244913 opt ns, 32081382 exec ns] [gvn-no-load-elimination;]
+|----| Agg min: [127 insts, 161068 opt ns, 31267143 exec ns] []
+|----| Agg mean: [118 insts, 237235 opt ns, 31983379 exec ns]
+|----| Agg max: [118 insts, 452599 opt ns, 33771066 exec ns] [instcombine;]
+--
+|----| Agg original: [127 insts, 210493 opt ns, 31680816 exec ns] []
+|----| Agg last: [127 insts, 385274 opt ns, 34318157 exec ns] [dse;]
+|----| Agg min: [127 insts, 449981 opt ns, 31570184 exec ns] [dse;nd-early-cse;]
+|----| Agg mean: [118 insts, 363559 opt ns, 32295552 exec ns]
+|----| Agg max: [127 insts, 385274 opt ns, 34318157 exec ns] [dse;]
+--
+|----| Agg original: [127 insts, 161069 opt ns, 31298022 exec ns] []
+|----| Agg last: [127 insts, 175389 opt ns, 32197712 exec ns] [constprop;]
+|----| Agg min: [127 insts, 161069 opt ns, 31298022 exec ns] []
+|----| Agg mean: [118 insts, 230877 opt ns, 31988596 exec ns]
+|----| Agg max: [127 insts, 194860 opt ns, 37799014 exec ns] [jump-threading;]
+--
+|----| Agg original: [127 insts, 163623 opt ns, 31711482 exec ns] []
+|----| Agg last: [127 insts, 262709 opt ns, 33503415 exec ns] []
+|----| Agg min: [127 insts, 193378 opt ns, 31179025 exec ns] [adce;]
+|----| Agg mean: [118 insts, 225709 opt ns, 32390057 exec ns]
+|----| Agg max: [127 insts, 170274 opt ns, 36173310 exec ns] []
+--
+|----| Agg original: [127 insts, 183864 opt ns, 31623651 exec ns] []
+|----| Agg last: [127 insts, 267010 opt ns, 32960109 exec ns] [indvars;reassociate;]
+|----| Agg min: [127 insts, 198099 opt ns, 31155732 exec ns] [die;reassociate;]
+|----| Agg mean: [118 insts, 223547 opt ns, 32106866 exec ns]
+|----| Agg max: [127 insts, 178237 opt ns, 34549015 exec ns] [die;]
+--
+|----| Agg original: [127 insts, 165136 opt ns, 31526410 exec ns] []
+|----| Agg last: [127 insts, 190163 opt ns, 32252023 exec ns] [nd-early-cse;]
+|----| Agg min: [127 insts, 393706 opt ns, 31414729 exec ns] [dse;nd-early-cse;]
+|----| Agg mean: [122 insts, 321612 opt ns, 32146519 exec ns]
+|----| Agg max: [127 insts, 373848 opt ns, 33946677 exec ns] [dse;]
+\end{lstlisting}
+
+\textbf{Discussion} We have a similar negative result where no particular run was very profitable.
+
+Finally, the next listing presents a subset of the results when run with \textbf{expert optimizations} applied. The full procedure used to produce this run is as follows:
+\begin{lstlisting}
+/* Load TPC-C with OLTPBenchmark --create=true --load=true. */
+SET pmenon_enable = true;
+SET profile_enable = true;
+SELECT C_FIRST, C_MIDDLE, C_ID, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_SINCE FROM customer WHERE C_W_ID = 2 AND C_D_ID = 5 AND C_LAST LIKE ‘a%’ ORDER BY C_FIRST; /* 10x */
+\end{lstlisting}
+
+\begin{lstlisting}
+> grep -A 4 original: tpcc_select_expert.txt  
+|----| Agg original: [113 insts, 599769 opt ns, 31279871 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [113 insts, 592277 opt ns, 32964854 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg min: [113 insts, 599769 opt ns, 31279871 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [113 insts, 632874 opt ns, 33061751 exec ns]
+|----| Agg max: [113 insts, 937190 opt ns, 39582158 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+--
+|----| Agg original: [113 insts, 604514 opt ns, 31736279 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [127 insts, 532395 opt ns, 32536341 exec ns] [dse;gvn;adce;simplifycfg;]
+|----| Agg min: [127 insts, 376043 opt ns, 31683757 exec ns] [reassociate;gvn;adce;simplifycfg;]
+|----| Agg mean: [113 insts, 418862 opt ns, 32617899 exec ns]
+|----| Agg max: [113 insts, 589678 opt ns, 37875476 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+--
+|----| Agg original: [113 insts, 734860 opt ns, 31325576 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [113 insts, 804062 opt ns, 32226713 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;dse;]
+|----| Agg min: [113 insts, 718675 opt ns, 31289834 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;aggressive-instcombine;]
+|----| Agg mean: [113 insts, 689353 opt ns, 32406489 exec ns]
+|----| Agg max: [113 insts, 799925 opt ns, 37202479 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;licm;aggressive-instcombine;]
+--
+|----| Agg original: [113 insts, 606854 opt ns, 31427134 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [127 insts, 573497 opt ns, 49375678 exec ns] [reassociate;gvn;simplifycfg;adce;sroa;memcpyopt;sink;sroa;gvn;]
+|----| Agg min: [127 insts, 416310 opt ns, 30791729 exec ns] [reassociate;gvn;simplifycfg;adce;sroa;memcpyopt;sink;sroa;]
+|----| Agg mean: [113 insts, 574880 opt ns, 31831876 exec ns]
+|----| Agg max: [127 insts, 573497 opt ns, 49375678 exec ns] [reassociate;gvn;simplifycfg;adce;sroa;memcpyopt;sink;sroa;gvn;]
+--
+|----| Agg original: [113 insts, 653554 opt ns, 31260410 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [113 insts, 663885 opt ns, 34415877 exec ns] [aggressive-instcombine;loop-deletion;gvn;simplifycfg;simplifycfg;]
+|----| Agg min: [113 insts, 624586 opt ns, 31007677 exec ns] [aggressive-instcombine;loop-deletion;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [113 insts, 633591 opt ns, 32101015 exec ns]
+|----| Agg max: [113 insts, 618316 opt ns, 37792914 exec ns] [aggressive-instcombine;loop-deletion;gvn;simplifycfg;adce;simplifycfg;]
+--
+|----| Agg original: [113 insts, 592692 opt ns, 31018692 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [113 insts, 677768 opt ns, 32705825 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;loop-reduce;]
+|----| Agg min: [113 insts, 592692 opt ns, 31018692 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [113 insts, 602194 opt ns, 32147835 exec ns]
+|----| Agg max: [113 insts, 671044 opt ns, 43641554 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;jump-threading;]
+--
+|----| Agg original: [113 insts, 733086 opt ns, 31109160 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [113 insts, 606790 opt ns, 32806305 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg min: [113 insts, 733086 opt ns, 31109160 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [113 insts, 608434 opt ns, 32155034 exec ns]
+|----| Agg max: [113 insts, 602517 opt ns, 38787336 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+--
+|----| Agg original: [113 insts, 662951 opt ns, 31319957 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [113 insts, 598255 opt ns, 32026952 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg min: [113 insts, 662951 opt ns, 31319957 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [113 insts, 614480 opt ns, 32078331 exec ns]
+|----| Agg max: [127 insts, 426075 opt ns, 34824591 exec ns] [loop-unroll-and-jam;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+--
+|----| Agg original: [113 insts, 590692 opt ns, 31275904 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [127 insts, 590911 opt ns, 31779946 exec ns] [nd-early-cse;reassociate;gvn;simplifycfg;adce;nd-gvn;loop-unroll;]
+|----| Agg min: [127 insts, 610072 opt ns, 30903603 exec ns] [nd-early-cse;reassociate;gvn;simplifycfg;adce;nd-gvn;loop-unroll;]
+|----| Agg mean: [113 insts, 629285 opt ns, 31931582 exec ns]
+|----| Agg max: [113 insts, 854839 opt ns, 35007018 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;nd-gvn;loop-unswitch;]
+--
+|----| Agg original: [113 insts, 616703 opt ns, 31184050 exec ns] [aggressive-instcombine;reassociate;gvn;simplifycfg;adce;simplifycfg;]
+|----| Agg last: [118 insts, 499051 opt ns, 32786169 exec ns] [aggressive-instcombine;reassociate;sccp;adce;simplifycfg;]
+|----| Agg min: [118 insts, 547734 opt ns, 31002474 exec ns] [aggressive-instcombine;reassociate;sccp;simplifycfg;adce;simplifycfg;]
+|----| Agg mean: [113 insts, 588220 opt ns, 31849649 exec ns]
+|----| Agg max: [113 insts, 592411 opt ns, 36662351 exec ns] [aggressive-instcombine;reassociate;gvn;adce;simplifycfg;]
+\end{lstlisting}
+
+\textbf{Discussion} Similarly, the expert picks take 2-3x longer to optimize at no appreciable consistent benefit to execution time. The expert picks do lower the instruction count though.
 
 %% ==================================================================
 %% DISCUSSION, SURPRISES, AND LESSONS LEARNED
