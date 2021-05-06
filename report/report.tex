@@ -190,7 +190,7 @@ In addressing these problems, salient challenges arise from the following source
     \item \textbf{The DBMS-Centric Context}: Some additional considerations introduced by the DBMS setting are:
     \begin{itemize}
         \item Highly Multi-User: No single query should starve the entire system of resources.
-        \item Time to First Response Matters: It is not acceptable to spend too long optimizing instead of quickly responding.
+        \item Time to First Response Matters: It is not acceptable to spend too long optimizing instead of quickly responding. We must locate an appropriate tradeoff between optimization time and the corresponding runtime performance improvement.
         \item Adaptive Execution Considerations: Fast OLTP queries are run through an interpreter, long OLAP queries are compiled in the background and swapped in when compilation is complete. This model lends itself well to multiple stages of compilation with different optimization levels. We are unaware of existing projects that draw a link between adaptive execution and profile-guided optimization.
     \end{itemize}
 \end{itemize}
